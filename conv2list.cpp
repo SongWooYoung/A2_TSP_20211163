@@ -2,9 +2,7 @@
 
 using namespace std;
 
-#define MAX 1e12
-
-// XmlToTspConverter method implementation
+// XmlToTspConverter
 XmlToTspConverter::XmlToTspConverter(const string& xml_file, const string& tsp_file, int num_vertices)
     : xml_filename(xml_file), tsp_filename(tsp_file), N(num_vertices) {}
 
@@ -42,7 +40,7 @@ void XmlToTspConverter::convert() {
     out.close();
 }
 
-// TspParser method implementation
+// TspParser
 TspParser::TspParser(const string& filename, int num_vertices)
     : tsp_filename(filename), N(num_vertices), dist(num_vertices, vector<double>(num_vertices, MAX)) {}
 
@@ -59,11 +57,9 @@ void TspParser::parse() {
             break;
     }
 
-    for (int i = 0; i < N; ++i) {
-        for (int j = 0; j < N; ++j) {
+    for (int i = 0; i < N; ++i)
+        for (int j = 0; j < N; ++j)
             in >> dist[i][j];
-        }
-    }
 
     in.close();
 }
@@ -79,15 +75,13 @@ void TspParser::print_matrix(int num) const {
     }
     for (int i = 0; i < num; ++i) {
         cout << "Vertex " << i << " → ";
-        for (double d : dist[i]){
-            if (d == MAX) cout << "INF ";
-            else          cout << d << " ";
-        }
+        for (double d : dist[i])
+            cout << (d == MAX ? "INF" : to_string(d)) << " ";
         cout << endl;
     }
 }
 
-// TspCoordParser method implementation
+// TspCoordParser
 TspCoordParser::TspCoordParser(const string& filename, int num_vertices)
     : tsp_filename(filename), N(num_vertices),
       coordinates(num_vertices),
@@ -154,10 +148,8 @@ void TspCoordParser::print_matrix(int num) const {
     }
     for (int i = 0; i < num; ++i) {
         cout << "Vertex " << i << " → ";
-        for (double d : dist[i]){
-            if (d == MAX) cout << "INF ";
-            else          cout << d << " ";
-        }
+        for (double d : dist[i])
+            cout << (d == MAX ? "INF" : to_string(d)) << " ";
         cout << endl;
     }
-} 
+}
