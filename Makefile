@@ -3,28 +3,32 @@ CXX = g++
 CXXFLAGS += -Wall -std=c++23 -g -fsanitize=address
 LDFLAGS += -fsanitize=address
 
-# 타겟 이름
-TARGET = tsp_parser
+# 타겟 목록
+TARGETS = tsp_parser christofides
 
-# 소스 및 오브젝트
-SRCS = conv2list.cpp pugixml.cpp
-OBJS = $(SRCS:.cpp=.o)
+# 타겟별 소스 및 오브젝트 파일
+SRCS_tsp_parser = conv2list.cpp pugixml.cpp
+SRCS_christofides = christofides.cpp conv2list.cpp pugixml.cpp
 
-# 기본 빌드 명령
-all: $(TARGET)
+OBJS_tsp_parser = $(SRCS_tsp_parser:.cpp=.o)
+OBJS_christofides = $(SRCS_christofides:.cpp=.o)
 
-$(TARGET): $(OBJS)
+# 기본 타겟 (모두 빌드)
+all: $(TARGETS)
+
+tsp_parser: $(OBJS_tsp_parser)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+christofides: $(OBJS_christofides)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $<
 
-# 일반 정리 명령
 clean:
-	@echo "🧹 Cleaning all object files and core dumps..."
-	@rm -f *.o *.out core
+	@echo "🧹 Cleaning all object files and executables..."
+	@rm -f *.o *.out core $(TARGETS)
 
-# cpp, h, hpp, tsv, xml 제외하고 모두 삭제
 coreclean:
 	@echo "🧼 Removing all files except .cpp, .h, .hpp, .tsp, and .xml..."
 	@find . -type f ! -name '*.cpp' ! -name '*.h' ! -name '*.hpp' \
