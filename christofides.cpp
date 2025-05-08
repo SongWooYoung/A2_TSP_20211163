@@ -29,41 +29,51 @@ int main() {
     // 1) push all weights of edge that a vertex v_i holds to pq
     // 2) comparing all the weights in pq, choose least edge weight that does not make cycle and "make visit to the vertex"
 
-    vector<xyw> pq;                 // save the weight value and its coordinate
-    priority_queue<xyw> vi_edges;           // save the vi_edges
-    bool is_visited[280];                   // dealing with the visited vertices
+    vector<bool> is_visited(weight.size(), false);              // whether the vertex is visited or not
+    vector<double> key(weight.size(), MAX);                     // minimum cost of connection of two vertices
+    vector<int> parent(weight.size(), -1);                      // parent of each connection
+    priority_queue<xyw, vector<xyw>> pq;                        // Min-Heap by weight
 
-    for (int i = 0; i < 280; i++) {
-        is_visited[i] = false;
-        if(!is_visited[i]) vi_edges.push({0, i, weight[0][i]});
-    }
-    is_visited[0] = true;
+    key[0] = 0;
+    pq.push({-1, 0, 0}); // 시작점 (parent 없음)
 
-    while (!vi_edges.empty()) {
-        // delete unnecessary edges
-        while (!vi_edges.empty() && is_visited[vi_edges.top().y]) vi_edges.pop();
-        if (vi_edges.empty()) break;
-    
-        xyw edge = vi_edges.top(); 
-        vi_edges.pop();
+    int edge_count = 0;
+    vector<xyw> mst_edges; // MST 간선 저장
 
-        int y = edge.y;
-    
-        is_visited[y] = true;
-        pq.push_back(edge); // save the mst result
-    
-        for (int i = 0; i < 280; ++i) {
-            if (!is_visited[i]) {
-                vi_edges.push({y, i, weight[y][i]});
+    while (!pq.empty() && edge_count < weight.size() - 1) {
+        xyw curr = pq.top(); pq.pop();
+        int u = curr.y;
+
+        if (is_visited[u]) continue;
+        is_visited[u] = true;
+
+        if (curr.x != -1) { // 첫 노드는 제외
+            mst_edges.push_back(curr);
+            edge_count++;
+        }
+
+        for (int v = 0; v < (int) weight.size(); ++v) {
+            if (!is_visited[v] && weight[u][v] < key[v]) {
+                key[v] = weight[u][v];
+                parent[v] = u;
+                pq.push({u, v, weight[u][v]});
             }
         }
     }
-    cout << "MST edges (x, y, weight):\n";
-    for (int i = 0; i < (int) pq.size(); i++) {
-        xyw edge = pq[i]; 
-        cout << i << ". x: " << edge.x << ", y: " << edge.y << ", weight: " << edge.weight << "\n";
-    }
 
+    // // 결과 출력
+    // cout << "MST edges (total " << mst_edges.size() << "):\n";
+    // int num = 0;
+    // for (auto& e : mst_edges) {
+    //     cout << num << ". x: " << e.x << ", y: " << e.y << ", weight: " << e.weight << "\n";
+    //     num++;
+    // }
+
+    // if (mst_edges.size() == weight.size() - 1) {
+    //     cout << "MST edge count is correct: 279\n";
+    // } else {
+    //     cout << "MST edge count incorrect! Got: " << mst_edges.size() << "\n";
+    // }
     // 2-1. make a set W of vertices that has odd degree in MST
     // 2-2. make a complete graph H connecting to each other vertex in W
     // 2-3. compute minimun_cost_perfect_matching, P.
