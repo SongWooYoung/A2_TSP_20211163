@@ -35,19 +35,19 @@ int main() {
     priority_queue<xyw, vector<xyw>> pq;                        // Min-Heap by weight
 
     key[0] = 0;
-    pq.push({-1, 0, 0}); // 시작점 (parent 없음)
+    pq.push({-1, 0, 0}); // initial point, there is no node
 
     int edge_count = 0;
-    vector<xyw> mst_edges; // MST 간선 저장
+    vector<xyw> mst_edges; // save MST edges
 
-    while (!pq.empty() && edge_count < weight.size() - 1) {
+    while (!pq.empty() && edge_count < (int) weight.size() - 1) {
         xyw curr = pq.top(); pq.pop();
         int u = curr.y;
 
         if (is_visited[u]) continue;
         is_visited[u] = true;
 
-        if (curr.x != -1) { // 첫 노드는 제외
+        if (curr.x != -1) { // first node is kust initailzer
             mst_edges.push_back(curr);
             edge_count++;
         }
@@ -74,12 +74,46 @@ int main() {
     // } else {
     //     cout << "MST edge count incorrect! Got: " << mst_edges.size() << "\n";
     // }
+
     // 2-1. make a set W of vertices that has odd degree in MST
+    vector<int> degree(280,0);
+    for (xyw edge : mst_edges) {
+        degree[edge.x]++;
+        degree[edge.y]++;
+    }
+
+    vector<int> W;
+    for (int i = 0; i < (int) degree.size(); i++) {
+        if ((degree[i]) % 2 != 0) {
+            W.push_back(i);
+        }
+    }
+
+    // cout << "odd vertices: ";
+    // for (int i: W) cout << i << " ";
+    // cout << endl;
+
     // 2-2. make a complete graph H connecting to each other vertex in W
-    // 2-3. compute minimun_cost_perfect_matching, P.
+    // idx != vertex -> need to synchronize
+    
+    vector<pair<int, int>> map;             //(index, odd_vertices)
+    for (int i = 0; i < (int) W.size(); i++) {
+        map.push_back(make_pair(i, W[i]));
+    }
+
+    int Wn = map.size();
+    vector<vector<double>> H(Wn, vector<double>(Wn, 0.0));
+    for (int i = 0; i < Wn; i++) {
+        for (int j = i + 1; j < Wn; j++) {
+            double dist = weight[map[i].second][map[j].second];
+            H[i][j] = H[j][i] = dist;
+        }
+    } 
+
+    // 2-3. compute minimun_cost_perfect_matching, P from H
 
 
-    // 3-1. Merge P and M-> G'
+    // 3-1. Merge P and M -> G'
     // 3-2. let all duplicated weight edges alive
     
     // 4. Create Euclidean circuit C in G', 
