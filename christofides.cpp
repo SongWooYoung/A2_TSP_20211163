@@ -1,126 +1,96 @@
-#include <iostream>
-#include "conv2list.h"
-#include <queue>
+#include "christofides.h"
+#include "mcmp.h"
+#include <cmath>
+#include <set>
+#include <limits>
+#include <unordered_map>
 
 using namespace std;
 
-struct xyw{
-    int x;
-    int y;
-    double weight;
+#define INF 1e12
 
-    bool operator<(const xyw& other) const {
-        return this -> weight > other.weight;
+double christofides::compute_distance(int u, int v) {
+    auto [x1, y1] = nodes[u];
+    auto [x2, y2] = nodes[v];
+    double dx = x1 - x2;
+    double dy = y1 - y2;
+    return sqrt(dx * dx + dy * dy);
+}
+
+christofides::christofides(const map<int, pair<double, double>>& nodes) {
+    this->nodes = nodes;
+}
+
+void christofides::compute_mst() {
+    if (this -> nodes.empty()) return;
+
+    set<int> in_mst;
+    set<int> remaining;
+    for (const auto& node : this -> nodes) {
+        remaining.insert(node.first);
     }
-};
 
-int main() {
+    // 임의 시작점
+    int start = this -> nodes.begin()->first;
+    in_mst.insert(start);
+    remaining.erase(start);
 
-    XmlToTspConverter a280T("a280.xml", "a280.tsp", 280);
-    a280T.convert();
-    TspParser a280TSP("a280.tsp", 280);
-    a280TSP.parse();
-    //a280TSP.print_matrix(5);
+    while (!remaining.empty()) {
+        double min_dist = INF;
+        int from = -1;
+        int to = -1;
 
-    vector<vector<double>> weight = a280TSP.get_matrix();
-
-    // 1. make MST, M
-    // Prim algorithm
-    // 1) push all weights of edge that a vertex v_i holds to pq
-    // 2) comparing all the weights in pq, choose least edge weight that does not make cycle and "make visit to the vertex"
-
-    vector<bool> is_visited(weight.size(), false);              // whether the vertex is visited or not
-    vector<double> key(weight.size(), MAX);                     // minimum cost of connection of two vertices
-    vector<int> parent(weight.size(), -1);                      // parent of each connection
-    priority_queue<xyw, vector<xyw>> pq;                        // Min-Heap by weight
-
-    key[0] = 0;
-    pq.push({-1, 0, 0}); // initial point, there is no node
-
-    int edge_count = 0;
-    vector<xyw> mst_edges; // save MST edges
-
-    while (!pq.empty() && edge_count < (int) weight.size() - 1) {
-        xyw curr = pq.top(); pq.pop();
-        int u = curr.y;
-
-        if (is_visited[u]) continue;
-        is_visited[u] = true;
-
-        if (curr.x != -1) { // first node is kust initailzer
-            mst_edges.push_back(curr);
-            edge_count++;
-        }
-
-        for (int v = 0; v < (int) weight.size(); ++v) {
-            if (!is_visited[v] && weight[u][v] < key[v]) {
-                key[v] = weight[u][v];
-                parent[v] = u;
-                pq.push({u, v, weight[u][v]});
+        // 현재 MST에 포함된 노드들에서, MST 밖의 노드까지 최소 거리 탐색
+        for (int u : in_mst) {
+            for (int v : remaining) {
+                double dist = compute_distance(u, v);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    from = u;
+                    to = v;
+                }
             }
         }
-    }
 
-    // // 결과 출력
-    // cout << "MST edges (total " << mst_edges.size() << "):\n";
-    // int num = 0;
-    // for (auto& e : mst_edges) {
-    //     cout << num << ". x: " << e.x << ", y: " << e.y << ", weight: " << e.weight << "\n";
-    //     num++;
-    // }
-
-    // if (mst_edges.size() == weight.size() - 1) {
-    //     cout << "MST edge count is correct: 279\n";
-    // } else {
-    //     cout << "MST edge count incorrect! Got: " << mst_edges.size() << "\n";
-    // }
-
-    // 2-1. make a set W of vertices that has odd degree in MST
-    vector<int> degree(280,0);
-    for (xyw edge : mst_edges) {
-        degree[edge.x]++;
-        degree[edge.y]++;
-    }
-
-    vector<int> W;
-    for (int i = 0; i < (int) degree.size(); i++) {
-        if ((degree[i]) % 2 != 0) {
-            W.push_back(i);
+        if (to != -1) {
+            this -> mst_edges.emplace_back(from, to);
+            in_mst.insert(to);
+            remaining.erase(to);
         }
     }
-
-    // cout << "odd vertices: ";
-    // for (int i: W) cout << i << " ";
-    // cout << endl;
-
-    // 2-2. make a complete graph H connecting to each other vertex in W
-    // idx != vertex -> need to synchronize
-    
-    vector<pair<int, int>> map;             //(index, odd_vertices)
-    for (int i = 0; i < (int) W.size(); i++) {
-        map.push_back(make_pair(i, W[i]));
-    }
-
-    int Wn = map.size();
-    vector<vector<double>> H(Wn, vector<double>(Wn, 0.0));
-    for (int i = 0; i < Wn; i++) {
-        for (int j = i + 1; j < Wn; j++) {
-            double dist = weight[map[i].second][map[j].second];
-            H[i][j] = H[j][i] = dist;
-        }
-    } 
-
-    // 2-3. compute minimun_cost_perfect_matching, P from H
-
-
-    // 3-1. Merge P and M -> G'
-    // 3-2. let all duplicated weight edges alive
-    
-    // 4. Create Euclidean circuit C in G', 
-
-    // 5. Convert C into a tour T.
-
-    return 0;
-
 }
+
+vector<pair<int, int>> christofides::get_mst_edges() {
+    return this -> mst_edges;
+}
+
+vector<mcpm_node>& christofides::odd_indices() {
+    // 노드 ID는 실제 ID 기준으로 degree를 관리
+    unordered_map<int, int> degrees; // index, num
+    for (const auto& node : this -> nodes) {
+        degrees[node.first] = 0;
+    }
+
+    for (const auto& edge : this->mst_edges) {
+        degrees[edge.first] += 1;
+        degrees[edge.second] += 1;
+    }
+    
+    int idx_at_odd = 1; // 1부터 담을것것
+    for (const auto& d : degrees) {
+        if (d.second % 2 == 1) {
+            mcpm_node v(idx_at_odd, d.first, this -> nodes[d.first].first, this -> nodes[d.first].second);
+            this -> oddIndices.push_back(v);
+        }
+    }
+
+    return this -> oddIndices;
+}
+
+void christofides::mcpm() {
+    blossomV minimum_cost_perfect_matching(this -> oddIndices);
+    minimum_cost_perfect_matching.execute_all();
+}
+
+
 

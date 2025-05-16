@@ -1,61 +1,109 @@
 #include "Held_Karp.h"
+#include <cmath>
 #include <algorithm>
-
-using namespace std;
 
 #define MAX 1e12
 
-HK_TSP::HK_TSP(const vector<vector<double>>& weight) {
-    this -> weight = weight;
-    this -> n = weight.size();
-    dp.resize((1 << this -> get_n()), vector<double>(n, MAX));
+using namespace std;
+
+void HK_TSP::build_weight(const map<int, pair<double, double>>& nodes) {
+    n = nodes.size();
+    weight.resize(n, vector<double>(n, 0.0));
+    vector<pair<double, double>> coords(n);
+
+    for (const auto& node : nodes) {
+        coords[node.first - 1] = node.second;
+    }
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            if (i == j) continue;
+            double dx = coords[i].first - coords[j].first;
+            double dy = coords[i].second - coords[j].second;
+            weight[i][j] = sqrt(dx * dx + dy * dy);
+        }
+    }
 }
 
-int HK_TSP::get_n() {
-    return this -> n;
-}
-int HK_TSP::get_dp_size() {
-    return this -> dp.size();
+HK_TSP::HK_TSP(const map<int, pair<double, double>>& nodes) {
+    build_weight(nodes);
+    dp.resize((1 << n), vector<double>(n, MAX));
+    parent.resize((1 << n), vector<int>(n, -1));  // 초기화
 }
 
 void HK_TSP::solve() {
-    int total_subset = (1 << this->n);
-    this -> dp[1] = vector<double>(this -> n, MAX);
-    this -> dp[1][0] = 0.0;
+    int total_subset = (1 << n);
+    dp[1][0] = 0.0;
 
     for (int mask = 1; mask < total_subset; ++mask) {
-        // Ensure dp[mask] exists
-        if (dp[mask].size() == 0) {
-            dp[mask] = vector<double>(n, MAX);
-        }
-
-        for (int present_city = 0; present_city < this -> n; ++present_city) {
+        for (int present_city = 0; present_city < n; ++present_city) {
             if (!(mask & (1 << present_city))) continue;
 
-            for (int next_city = 0; next_city < this -> n; ++next_city) {
+            for (int next_city = 0; next_city < n; ++next_city) {
                 if ((mask & (1 << next_city)) || present_city == next_city) continue;
 
                 int next_mask = mask | (1 << next_city);
-
-                // Initialize dp[next_mask] if it doesn't exist
-                if (dp[next_mask].size() == 0) {
-                    dp[next_mask] = vector<double>(this -> n, MAX);
-                }
-
                 double cost = dp[mask][present_city] + weight[present_city][next_city];
-                dp[next_mask][next_city] = min(dp[next_mask][next_city], cost);
+
+                if (cost < dp[next_mask][next_city]) {
+                    dp[next_mask][next_city] = cost;
+                    parent[next_mask][next_city] = present_city;  // 경로 저장
+                }
             }
         }
     }
 }
 
-
 double HK_TSP::min_cost() {
-    // lowest cost
-    int total_subset = (1 << this -> n);
-    double min_cost = MAX;
+    int total_subset = (1 << n);
+    double min_total_cost = MAX;
+    int last_city = -1;
     for (int j = 1; j < n; ++j) {
-        min_cost = min(min_cost, this -> dp[total_subset - 1][j] + weight[j][0]);
+        double cost = dp[total_subset - 1][j] + weight[j][0];
+        if (cost < min_total_cost) {
+            min_total_cost = cost;
+            last_city = j;
+        }
     }
-    return min_cost;
+
+    // 복원을 위해 마지막 도시 저장
+    parent[total_subset - 1][0] = last_city;
+    return min_total_cost;
+}
+
+vector<int> HK_TSP::get_path() {
+    vector<int> path;
+    int mask = (1 << n) - 1;
+    int last = -1;
+
+    // 최종 도시 찾기 (min_cost()에서 parent에 기록된 last_city)
+    double min_total_cost = MAX;
+    for (int j = 1; j < n; ++j) {
+        double cost = dp[mask][j] + weight[j][0];
+        if (cost < min_total_cost) {
+            min_total_cost = cost;
+            last = j;
+        }
+    }
+
+    // 뒤에서부터 경로 복원
+    path.push_back(0); // 시작점
+    int current = last;
+    int current_mask = mask;
+    vector<int> reverse_path;
+    reverse_path.push_back(current);
+
+    while (current != 0) {
+        int prev = parent[current_mask][current];
+        reverse_path.push_back(prev);
+        current_mask ^= (1 << current);
+        current = prev;
+    }
+
+    // 뒤집고 시작점 추가
+    for (auto it = reverse_path.rbegin(); it != reverse_path.rend(); ++it) {
+        path.push_back(*it);
+    }
+
+    return path;
 }

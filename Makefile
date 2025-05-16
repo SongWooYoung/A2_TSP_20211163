@@ -4,16 +4,20 @@ CXXFLAGS += -Wall -std=c++23 -g -fsanitize=address
 LDFLAGS += -fsanitize=address
 
 # 타겟 목록
-TARGETS = tsp_parser christofides test
+TARGETS = tsp_parser christofides test test2 test3
 
 # 타겟별 소스 및 오브젝트 파일
 SRCS_tsp_parser = conv2list.cpp pugixml.cpp
 SRCS_christofides = christofides.cpp conv2list.cpp pugixml.cpp
-SRCS_test = test.cpp conv2list.cpp pugixml.cpp Held_Karp.cpp #chrisofides.cpp
+SRCS_test = test.cpp conv2list.cpp pugixml.cpp Held_Karp.cpp
+SRCS_test2 = test2.cpp Held_Karp.cpp
+SRCS_test3 = test3.cpp christofides.cpp
 
 OBJS_tsp_parser = $(SRCS_tsp_parser:.cpp=.o)
 OBJS_christofides = $(SRCS_christofides:.cpp=.o)
 OBJS_test = $(SRCS_test:.cpp=.o)
+OBJS_test2 = $(SRCS_test2:.cpp=.o)
+OBJS_test3 = $(SRCS_test3:.cpp=.o)
 
 # 기본 타겟 (모두 빌드)
 all: $(TARGETS)
@@ -26,6 +30,13 @@ christofides: $(OBJS_christofides)
 
 test: $(OBJS_test)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+test2: $(OBJS_test2)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+test3: $(OBJS_test3)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $<

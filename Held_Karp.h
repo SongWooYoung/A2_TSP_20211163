@@ -2,21 +2,26 @@
 #define HELD_KARP_H
 
 #include <vector>
-#include <iostream>
-#include <unordered_map>
+#include <map>
+#include <utility>
 
 class HK_TSP {
 private:
-    std::vector<std::vector<double>> weight;
     int n;
-    std::vector<std::vector<double>> dp; // <maksed_path 2^n, n cities (last city)>
-    // -> it is really hard to maintain 2^n by 2^n list by vector<vector>
+    std::vector<std::vector<double>> weight;
+    std::vector<std::vector<double>> dp;
+    std::vector<std::vector<int>> parent;
+
+    void build_weight(const std::map<int, std::pair<double, double>>& nodes);
+
 public:
-    HK_TSP(const std::vector<std::vector<double>>& weight);
-    int get_n();
-    int get_dp_size();
+    HK_TSP(const std::map<int, std::pair<double, double>>& nodes);
+
     void solve();
     double min_cost();
+
+    // 경로 복원
+    std::vector<int> get_path();
 };
 
 #endif
