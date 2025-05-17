@@ -1,5 +1,6 @@
 #include "mcmp.h"
 #include <algorithm>
+#include <cmath>
 
 using namespace std;
 
@@ -13,6 +14,7 @@ mcpm_node::mcpm_node(int idx_odd, int idx_nodes, int x, int y) : index_at_oddInd
     this -> parent              = -1; 
     this -> is_blossom          = false;
     this -> blossom_members     = nullptr;
+    this -> dual_value          = 0;
 }
 
 mcpm_node& mcpm_node::operator=(mcpm_node& other) {
@@ -27,7 +29,9 @@ mcpm_node& mcpm_node::operator=(mcpm_node& other) {
     this -> parent              = other.parent;
     this -> is_blossom          = other.is_blossom;
     this -> blossom_members     = other.blossom_members;
+    this -> dual_value          = other.dual_value;
 }
+
 void mcpm_node::init() {
     this -> pair                = -1;
     this -> tag                 = 0;
@@ -36,6 +40,7 @@ void mcpm_node::init() {
     this -> parent              = -1;
     this -> is_blossom          = false;
     this -> blossom_members     = nullptr;
+    this -> dual_value          =  0;
 }
 //////////////////////////////
 
@@ -43,23 +48,23 @@ blossomV::blossomV(vector<mcpm_node>& list) : node_list(list) {
     
     this -> nl_size             =  (int) this -> node_list.size();
     this -> matching_num        = 0;
-    this -> total_tree_num      = 0;
+    //this -> total_tree_num      = 0;
 }
 
 void blossomV::Grow(mcpm_node_idx u, mcpm_node_idx v, queue<int>& grow_queue) {
     // Grow -> + none 만 고려
     // 일단 blossom 없이 구현 한다음 blossom을 추가하자
-    // 애초애 mcpm_node 자체가 blossom도 될 수 있게 설계해서 아래 코드가 바로 작동하도록 만들고 싶음음
+    // 애초애 mcpm_node 자체가 blossom도 될 수 있게 설계해서 아래 코드가 바로 작동하도록 만들고 싶음
     // SHRINK와 mcpm_node를 잘 조작 해보자
 
-    auto& u_node = this -> node_list[u];
-    auto& v_node = this -> node_list[v];
+    if (!check_tight(u, v)) return; // -> primal dual에서 이미 처리리
 
-    v_node.tag = -1;
-    v_node.parent = u_node.index_at_oddIndices;
-    if (u_node.is_root) v_node.root = u_node.index_at_oddIndices;
-    else v_node.root = u_node.root;
-    grow_queue.push(v_node.index_at_oddIndices);
+    auto [rep_u, rep_v] = find_rep(u, v); //https://www.geeksforgeeks.org/structured-binding-c/ -> 선언이 귀찮아서...
+
+    this -> node_list[rep_v].parent = node_list[rep_u].index_at_oddIndices;
+    this -> node_list[rep_v].root = node_list[rep_u].is_root ? node_list[rep_u].index_at_oddIndices : node_list[rep_u].root;
+
+    grow_queue.push(node_list[rep_v].index_at_oddIndices);
 }
 
 void blossomV::Augment(mcpm_node_idx u, mcpm_node_idx v, std::queue<int>& grow_queue) {
@@ -68,22 +73,23 @@ void blossomV::Augment(mcpm_node_idx u, mcpm_node_idx v, std::queue<int>& grow_q
     // 애초애 mcpm_node 자체가 blossom도 될 수 있게 설계해서 아래 코드가 바로 작동하도록 만들고 싶음
     // free_tree를 하면서 모든 node의 tag를 초기화 -> 따라서 u, v 는 무조건 primal_update 조건에 걸러져서 반드시 트리만 들어옴
 
-    auto& u_node = this -> node_list[u];
-    auto& v_node = this -> node_list[v];
+    if (this->node_list[u].tag == this->node_list[v].tag) return; 
 
-    if (!(u_node.tag == 1 && v_node.tag == 1) || !(u_node.tag * v_node.tag == -1)) return;
+    auto [rep_u, rep_v] = find_rep(u, v);
+
     
-    this -> matching(u,v);     
+    this -> matching(rep_u, rep_v);
     // u와 v가 서로 다른 tree의 중간 노드 일수 있음 -> 간과 했다...
-    this -> flip(u);     
-    this -> flip(v);
-    this -> free_tree(u);
-    if (this -> node_list[v].root != this -> node_list[u].root) { // root가 같을 수도 있음 -> root 같고 ++이면 shrink, root 같고 + -면 augment
-        this -> free_tree(v);
+    this -> flip(rep_u);
+    this -> flip(rep_v);
+    this -> free_tree(rep_u);
+    if (this -> node_list[rep_u].root != this -> node_list[rep_v].root) { // root가 같을 수도 있음 -> root 같고 ++이면 shrink, root 같고 + -면 augment
+        this -> free_tree(rep_v);
     }
     
     // empty the queue
-    while (!grow_queue.empty()) grow_queue.pop();
+    queue<int> empty;
+    swap(grow_queue, empty); //https://stackoverflow.com/questions/709146/how-do-i-clear-the-stdqueue-efficiently
     this -> matching_num++;
     return;
 }
@@ -143,8 +149,9 @@ void blossomV::Expand(mcpm_node_idx u, mcpm_node_idx v) {
 }
 
 void blossomV::primal_update(mcpm_node_idx u, mcpm_node_idx v, queue<int>& grow_queue) {
-    auto& u_node = this -> node_list[u];
-    auto& v_node = this -> node_list[v];
+
+    auto [u_node, v_node] = pair(this->node_list[u], this->node_list[v]);
+
 
     if (u_node.tag != 1) return; // +는 능동적 -는 수동적
 
@@ -174,8 +181,8 @@ void blossomV::dual_update() {
 }
 
 void blossomV::matching(mcpm_node_idx u, mcpm_node_idx v) {
-    auto& u_node = this -> node_list[u];
-    auto& v_node = this -> node_list[v];
+
+    auto [u_node, v_node] = pair(this->node_list[u], this->node_list[v]);
 
     u_node.pair = v_node.index_at_oddIndices;
     v_node.pair = u_node.index_at_oddIndices;
@@ -206,13 +213,24 @@ void blossomV::free_tree(mcpm_node_idx i) { // 모든 tag초기화
 }
 
 bool blossomV::check_tight(mcpm_node_idx u, mcpm_node_idx v) {
+    // slack 값값 구현 -> 두 노드의 slack 값 차이 
+    auto [u_node, v_node] = pair(this->node_list[u], this->node_list[v]);
 
+    double cost = sqrt((u_node.x - v_node.x)*(u_node.x - v_node.x) + (u_node.y - v_node.y)*(u_node.y - v_node.y));
+
+    double slack = u_node.dual_value - v_node.dual_value - cost;
+    // double을 같다 비교 해도 되나?? -> 오차땜시
+    // https://www.youtube.com/watch?v=6GuG0bCZdXQ
+    // https://floating-point-gui.de/errors/comparison/
+    return (slack == 0); 
 }
-pair<mcpm_node_idx, mcpm_node_idx> blossomV::find_rep(mcpm_node_idx u, mcpm_node_idx v) {
-    auto& u_node = this -> node_list[u];
-    auto& v_node = this -> node_list[v];
 
-    if (u_node.is_blossom && v_node.is_blossom) { // 둘다다
+
+pair<mcpm_node_idx, mcpm_node_idx> blossomV::find_rep(mcpm_node_idx u, mcpm_node_idx v) {
+
+    auto [u_node, v_node] = pair(this->node_list[u], this->node_list[v]);
+
+    if (u_node.is_blossom && v_node.is_blossom) { // 둘다
         for (auto rep1 : *u_node.blossom_members) {
             for (auto rep2 : *v_node.blossom_members) {
                 if (this -> check_tight(rep1, rep2)) {
@@ -221,6 +239,7 @@ pair<mcpm_node_idx, mcpm_node_idx> blossomV::find_rep(mcpm_node_idx u, mcpm_node
             }
         }
     }
+
     else if (u_node.is_blossom) { // u가 blo
         for (auto rep1 : *u_node.blossom_members) {
             if (this -> check_tight(rep1, v)) {
@@ -228,6 +247,7 @@ pair<mcpm_node_idx, mcpm_node_idx> blossomV::find_rep(mcpm_node_idx u, mcpm_node
             }
         }
     }
+
     else if (v_node.is_blossom) { //vㄱ blo
         for (auto rep1 : *v_node.blossom_members) {
             if (this -> check_tight(u, rep1)) {
@@ -235,6 +255,7 @@ pair<mcpm_node_idx, mcpm_node_idx> blossomV::find_rep(mcpm_node_idx u, mcpm_node
             }
         }
     }
+
     else {
         return {u, v};  // 둘 다 blossom 아닐 때는 바로 반환
     }
@@ -246,7 +267,6 @@ pair<mcpm_node_idx, mcpm_node_idx> blossomV::find_rep(mcpm_node_idx u, mcpm_node
 // 모든 tag는 각 함수 내에서 적용 될것 -> 왜냐하면 root 를 +로 정해놓고 나머지는 0으로 출발하기 때문에, 각 작업을 거치면서 알아서 변화 하도록 구현 예정정
 void blossomV::execute_all() {
     while (this -> matching_num < (this -> nl_size) / 2) {              // 계속 반복하다가 완전히 매칭 되는 경우 탈출
-        int tree_id = this -> total_tree_num++;                                 // tree는 0 부터 저장 될것 -> 저장후 1을 늘려서 다음 위치를 명시시
         queue<int> grow_queue;                                          // tight_nodes(tree 역할)은 계속 확장되어야 해서 새로운 queue필요요
 
         for (mcpm_node_idx i = 1; i < this -> nl_size; i++) {                 

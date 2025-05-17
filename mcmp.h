@@ -25,6 +25,7 @@ struct mcpm_node {
     bool is_blossom;                    // shrink expand 구현할때 사용할것
     std::vector<mcpm_node_idx>* blossom_members; // memebr 저장 -> stuct마다 박으면 메모리 소모량 과다
 
+    int dual_value;                     // this is used for slack, and will be updated by dua_update()
 
     mcpm_node(int idx_odd, int idx_nodes, int x, int y);
     mcpm_node& operator=(mcpm_node& other);
@@ -36,7 +37,7 @@ private:
     std::vector<mcpm_node>& node_list; // oddIndices 받아옴
     int nl_size;
     int matching_num;
-    int total_tree_num;
+    //int total_tree_num;
 
 public:
 
@@ -52,7 +53,6 @@ public:
     void free_tree(mcpm_node_idx i);
     bool check_tight(mcpm_node_idx u, mcpm_node_idx v);
     std::pair<mcpm_node_idx, mcpm_node_idx> find_rep(mcpm_node_idx u, mcpm_node_idx v);
-
     void execute_all();
 };
 
