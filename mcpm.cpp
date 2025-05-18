@@ -253,29 +253,12 @@ void blossomV::Augment(mcpm_node_idx u, mcpm_node_idx v) {
     // 둘 사이의 Augmenting Path가 발견된 상황
 
     this -> matching(u, v);  // u와 v는 직접 매칭됨
-
     // u 쪽 트리를 따라 올라가며 flip
     // 이전에는 계속 matching을 넣어주려고 했는데 이제는 상황 발생하면 역으로 진행하면서 matching을 넣어 주는 걸로 
-    mcpm_node_idx cur = u;
-    while (this -> node_list[cur].parent != -1) {
-        mcpm_node_idx p = this -> node_list[cur].parent;
-        mcpm_node_idx gp = this -> node_list[p].parent;
-
-        this -> matching(p, gp);
-        cur = gp;
-    }
-
+    this -> flip(u);
     // v 쪽 트리를 따라 올라가며 flip
-    cur = v;
-    while (this -> node_list[cur].parent != -1) {
-        mcpm_node_idx p = this -> node_list[cur].parent;
-        mcpm_node_idx gp = this -> node_list[p].parent;
+    this -> flip(v);
 
-        this -> matching(p, gp);
-        cur = gp;
-    }
-
-    this -> matching_num++;  // 실제 augmenting path 1개 반영
 }
 
 
@@ -352,3 +335,14 @@ void blossomV::matching(mcpm_node_idx u, mcpm_node_idx v) {
     this -> matching_num++;  // 한 쌍 추가
 }
 
+void blossomV::flip(mcpm_node_idx i) {
+    mcpm_node_idx cur = i;
+
+    while (this -> node_list[cur].parent != -1) {
+        mcpm_node_idx p = this->node_list[cur].parent;
+        mcpm_node_idx gp = this->node_list[p].parent;
+
+        this -> matching(cur, p);  // cur <-> parent 매칭
+        cur = gp;
+    }
+}

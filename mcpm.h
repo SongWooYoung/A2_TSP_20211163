@@ -86,6 +86,8 @@ public:
 
     // Blossom bookkeeping
     mcpm_node_idx allocate_new_pseudo();
+    void add_free_blossom_index(mcpm_node_idx u);
+    void clear_blossom_indices();
 
     // Dual update
     void dual_update();
