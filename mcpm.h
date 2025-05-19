@@ -54,11 +54,12 @@ private:
 
     std::vector<mcpm_node_idx> root;                        // 해당 index가 어떤 root의 alternating tree에 존재하는지
     std::vector<std::list<mcpm_node_idx>> internal_node;    // 각 blossom의 내부 노드들
-    std::vector<std::list<mcpm_node_idx>> tree;             // shrink 시 shallow 회로
+    std::vector<std::list<mcpm_node_idx>> blo_tree;             // shrink 시 shallow 회로
     std::vector<mcpm_node_idx> tip;                         // 각 blossom의 tip (== LCA of shrinked cycle)
     std::vector<mcpm_node_idx> free_blossom_indices;        // 사용할 수 있는 가짜 노드 index
     std::queue<mcpm_node_idx> grow_queue;
     std::vector<double> slack;                              // edge별 slack 값 (거리 기반)
+    std::queue<mcpm_node_idx> recycle_idx;                  // 빈 인덱스 보장 -> 바로 사용 가능 O(1)
     
 public:
     blossomV(std::vector<mcpm_node>& list);
@@ -82,12 +83,10 @@ public:
 
     // 기타 유틸리티
     bool check_tight(mcpm_node_idx u, mcpm_node_idx v);
-    double distance(mcpm_node_idx u, mcpm_node_idx v);
 
-    // Blossom bookkeeping
+    // blossom 할당 및 정리
     mcpm_node_idx allocate_new_pseudo();
     void add_free_blossom_index(mcpm_node_idx u);
-    void clear_blossom_indices();
 
     // Dual update
     void dual_update();
