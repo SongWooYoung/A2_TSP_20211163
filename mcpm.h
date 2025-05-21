@@ -9,6 +9,7 @@
 #include <limits>
 #include <cassert>
 
+
 // 논문과 아래 깃허브에 구현된 방향성을 참고해 구현 하였음
 // https://github.com/dilsonpereira/Minimum-Cost-Perfect-Matching
 
@@ -26,7 +27,7 @@ struct mcpm_node {
     // 기본 정보
     mcpm_node_idx index_at_oddIndices;  // Working set에서의 인덱스 -> 얘가 mcpm_node_idx
     int index_at_nodes;                 // 실제 그래프 인덱스
-    int x, y;                           // 위치 정보 (거리 계산용)
+    double x, y;                           // 위치 정보 (거리 계산용)
 
     // 상태 정보
     NodeType type;                      // EVEN, ODD, UNLABELED
@@ -102,7 +103,7 @@ public:
     void Clear();
 
     // 결과값 출력
-    std::vector<std::pair<mcpm_node_idx, mcpm_node_idx>> get_pairs();
+    void merge_pairs(std::vector<std::tuple<int, int, double>>& mst_edges);
 };
 
 #endif
