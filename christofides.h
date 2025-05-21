@@ -19,7 +19,8 @@ public:
     std::vector<std::pair<int, int>> get_mst_edges();
     std::vector<mcpm_node>& odd_indices();
     void print_oddIndices();
-    void mcpm();
+    std::vector<std::pair<mcpm_node_idx, mcpm_node_idx>> mcpm();
+    std::vector<std::pair<int, int>> get_mst_edges();
 };
 
 #endif

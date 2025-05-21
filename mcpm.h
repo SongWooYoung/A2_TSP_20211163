@@ -9,6 +9,9 @@
 #include <limits>
 #include <cassert>
 
+// 논문과 아래 깃허브에 구현된 방향성을 참고해 구현 하였음
+// https://github.com/dilsonpereira/Minimum-Cost-Perfect-Matching
+
 #define INF 1e12
 
 typedef int mcpm_node_idx;
@@ -58,7 +61,6 @@ private:
     std::vector<mcpm_node_idx> root;                        // 해당 index가 어떤 root의 alternating tree에 존재하는지
     std::vector<mcpm_node_idx> tip;                         // 각 blossom의 tip (== LCA of shrinked cycle)
     std::queue<mcpm_node_idx> grow_queue;
-    //std::vector<double> slack;                            // edge별 slack 값 (거리 기반)
     std::queue<mcpm_node_idx> recycle_idx;                  // 빈 인덱스 보장 -> 바로 사용 가능 O(1)
     std::vector<std::list<mcpm_node_idx>> internal_node;    // 각 blossom의 내부 노드들
     std::vector<std::list<mcpm_node_idx>> blo_tree;         // shrink 시 shallow 회로
@@ -87,7 +89,6 @@ public:
 
     // 기타 유틸리티
     bool check_tight(mcpm_node_idx u, mcpm_node_idx v);
-    void node_list_info();
     void debug_alternating_tree_state();
 
     // blossom 할당 및 정리
@@ -99,6 +100,9 @@ public:
 
     // 초기화
     void Clear();
+
+    // 결과값 출력
+    std::vector<std::pair<mcpm_node_idx, mcpm_node_idx>> get_pairs();
 };
 
 #endif

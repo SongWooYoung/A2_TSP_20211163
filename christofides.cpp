@@ -99,11 +99,14 @@ void christofides::print_oddIndices() {
     }
 }
 
-void christofides::mcpm() {
-    // Matching minimum_cost_perfect_matching(this -> oddIndices);
-    // minimum_cost_perfect_matching.solve();
+vector<pair<mcpm_node_idx, mcpm_node_idx>> christofides::mcpm() {
     blossomV minimum_cost_perfect_matching(this -> oddIndices); 
     minimum_cost_perfect_matching.execute_all();
+    return minimum_cost_perfect_matching.get_pairs();
+}
+
+std::vector<std::pair<int, int>> christofides::get_mst_edges() {
+    return this -> mst_edges;
 }
 
 

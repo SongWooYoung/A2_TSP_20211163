@@ -22,11 +22,20 @@ int main() {
 
     christofides xql662(selected_nodes);
 
+    // 1. MST
     xql662.compute_mst();
-    xql662.odd_indices();
-    //xql662.print_oddIndices();
+    vector<pair<int, int>> even_degree_edges = xql662.get_mst_edges();
 
-    xql662.mcpm();
+    // 2. get odd indices
+    xql662.odd_indices();
+ 
+    // 3. do minimum perfect matching and get pairs
+    vector<pair<mcpm_node_idx, mcpm_node_idx>> get_edges = xql662.mcpm();
+    
+    // 4. merge pairs with mst edges
+    even_degree_edges.insert(even_degree_edges.end(), get_edges.begin(), get_edges.end());
+
+    // 5. Euler path
 
     return 0;
 }
