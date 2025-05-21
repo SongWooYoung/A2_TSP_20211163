@@ -2,15 +2,10 @@
 #include <algorithm>
 #include <cmath>
 #include <queue>
+#include <iostream>
 
 
 using namespace std;
-
-mcpm_node extra_node(mcpm_node_idx i) {
-    mcpm_node node(i,-1,-1,-1);
-    node.init();
-    return node;
-}
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -20,7 +15,7 @@ mcpm_node::mcpm_node(int idx_odd, int idx_nodes, int x, int y)
 {
     this -> pair                    = -1;
     this -> type                    = UNLABELED;
-    this -> root                    = -1;
+    //this -> root                    = -1;
     this -> parent                  = -1;
     this -> visited                 = false;
     this -> active                  = true;  // 기본 노드는 활성 상태
@@ -37,7 +32,7 @@ mcpm_node& mcpm_node::operator=(mcpm_node& other) {
 
     this -> pair                    = other.pair;
     this -> type                    = other.type;
-    this -> root                    = other.root;
+    //this -> root                    = other.root;
     this -> parent                  = other.parent;
     this -> visited                 = other.visited;
     this -> active                  = other.active;
@@ -49,19 +44,30 @@ mcpm_node& mcpm_node::operator=(mcpm_node& other) {
     return *this;
 }
 
-void mcpm_node::init_with_out_pair() {
+void mcpm_node::init_with_out_pair_and_active() {
     this -> type                    = UNLABELED;
     this -> parent                  = -1;
     this -> visited                 = false;
-    this -> active                  = true;
-    this -> root                    = -1;
     this -> is_blossom              = false;
-    this -> dual_value              = 0.0;
 }
 
 void mcpm_node::init() {
-    this -> init_with_out_pair();
+    this -> init_with_out_pair_and_active();
     this -> pair = -1;
+    this -> active = true;
+}
+
+void mcpm_node::free_blossom_node() {
+    this -> x                       = -1;
+    this -> y                       = -1;
+    this -> index_at_nodes          = -1;
+    this -> pair                    = -1;
+    this -> type                    = UNLABELED;
+    this -> parent                  = -1;
+    this -> visited                 = false;
+    this -> active                  = false;
+    this -> is_blossom              = false;
+    this -> dual_value              = 0.0;
 }
 
 //////////////////////////////
@@ -72,7 +78,7 @@ blossomV::blossomV(vector<mcpm_node>& list) : node_list(list) {
     this -> matching_num = 0;
 
     for (mcpm_node_idx i = this -> origin_num; i < this -> nl_size; ++i) {
-        this -> node_list.push_back(extra_node(i));
+        this -> node_list.emplace_back(i, -1, -1, -1);
     }
 }
 
@@ -83,15 +89,32 @@ void blossomV::execute_all() {
 
     // 초기 Heuristic Matching으로 일부 edge 채움 (성능 가속)
     // greedy 하게 일단 채움
+    this -> initialize_duals();
     this -> Heuristic();
 
-    // perfect matching이 될 때까지 반복
+    //this -> node_list_info();
+
     this -> init_without_pair();
-    while (this -> matching_num < this -> origin_num / 2) {
+
+    int num = 1;
+    while (this -> matching_num  < this -> origin_num/2) {
+
+        if (num > 7) break;
+        cout << "PHASE:" << num << endl;
+        cout << "Purpose: " << this -> origin_num / 2 << endl;
+        cout << "Matching NUM: " << this -> matching_num << endl;
+
         this -> Grow();
+        //this -> debug_alternating_tree_state();
+
         this -> dual_update();
+        //this -> debug_alternating_tree_state();
+
         this -> init_without_pair();
+        num++;
     }
+    this -> debug_alternating_tree_state();
+    cout << "IF YOU REACH HERE, ALL IS DONE" << endl;
 }
 
 void blossomV::Clear() {
@@ -103,9 +126,9 @@ void blossomV::Clear() {
     this -> grow_queue = queue<int>();
     //this -> slack.assign(this -> nl_size * nl_size, 0);
 
-    this -> free_blossom_indices.clear();
+    this -> recycle_idx = queue<mcpm_node_idx>();
     for (mcpm_node_idx i = this -> origin_num; i < this -> nl_size; ++i) {
-        this -> free_blossom_indices.push_back(i);
+        this -> recycle_idx.push(i);
     }
 
     for (mcpm_node_idx i = 0; i < nl_size; ++i) {
@@ -144,7 +167,7 @@ void blossomV::Heuristic() {
     }
 
     // 2. degree 순으로 min-heap에 넣기 -> 자동 정렬 -> degree 낮은 순
-    // https://www.naukri.com/code360/library/vector-push_back-vs-emplace_back
+    // https://www.naukri.com/codexpand_e60/library/vector-push_back-vs-emplace_back
     for (int i = 0; i < this -> origin_num; ++i) {
         pq.emplace(degree[i], i);
     }
@@ -168,99 +191,152 @@ void blossomV::Heuristic() {
         if (best_v != -1) {
             this -> matching(u, best_v);
             used[u] = used[best_v] = true;
-            this -> matching_num++;
         }
     }
 }
 
 void blossomV::Grow() {
-    
-    // Grow queue를 통해 BFS 방식으로 blo_tree 확장
     while (!this -> grow_queue.empty()) {
         mcpm_node_idx u = this -> grow_queue.front();
-        grow_queue.pop();
+        cout << "Current front: " << u << endl;
+        cout << "Current grow_gueue Len: " << this -> grow_queue.size() << endl;
+        this -> grow_queue.pop();
 
-        for (mcpm_node_idx v = 0; v < this -> origin_num; ++v) {
+        for (mcpm_node_idx v = 0; v < this -> nl_size; ++v) {
             if (u == v) continue;
-            if (!this -> check_tight(u, v)) continue; // slack == 0인 edge만 사용
+            if (this -> node_list[v].x == -1 && this -> node_list[v].y == -1) {
+                cout << v << ": Grow Rejected (empty)" << endl;
+                continue;
+            }
 
-            auto& u_node = this -> node_list[u];
-            auto& v_node = this -> node_list[v];
+            if (!this -> check_tight(u, v)) {
+                cout << v << ": Grow Rejected (not tight)" << endl;
+                continue;
+            }
 
-            // v가 UNLABELED 상태이면 blo_tree에 추가
-            if (v_node.type == UNLABELED) {
-                v_node.parent = u;
-                v_node.root = u_node.root;
-                v_node.type = ODD;
-
-                // expand나 augment로 인해 blo_tree가 터지는 경우 pair를 남기고 전부 초기화 
-                // 따라서 다른 alterning blo_tree가 성장 할때 만나면 그 짝도 연결 필요 
-                //둘중 누구를 -로 설정할지는 구현 차이
-                mcpm_node_idx vm = v_node.pair;
-                if (vm != -1) { 
-                    auto& vm_node = this -> node_list[vm];
-                    vm_node.parent = v;
-                    vm_node.root = u_node.root;
-                    vm_node.type = EVEN;
-                    vm_node.visited = true;
-                    this -> grow_queue.push(vm);  // 짝은 다음 BFS 대상
+            // 방문된 노드 처리
+            if (this -> node_list[v].visited) {
+                // 둘 다 EVEN 이면 shrink or augment
+                if (this -> node_list[u].type == EVEN && this -> node_list[v].type == EVEN) {
+                    if (this -> root[u] != this -> root[v]) {
+                        // augmenting path 발견
+                        cout << v << ": Grow Permitted (AUGMENT)" << endl;
+                        this -> Augment(u, v);
+                        this -> init_without_pair();
+                        return;
+                    } else {
+                        // 같은 tree 안의 (+,+): shrink
+                        if (u > v) {
+                            cout << v << ": Grow Permitted (SHRINK)" << endl;
+                            mcpm_node_idx rep = this -> Shrink(u, v);
+                            this -> grow_queue.push(rep); // blossom 대표 노드 추가
+                            this -> debug_alternating_tree_state();
+                        }
+                        else {
+                            cout << v << ": Grow Denied (SHRINK: u < v)" << endl;
+                        }
+                        continue;
+                    }
+                } else {
+                    // 나머지는 방문 불필요
+                    cout << v << ": Grow Rejected (already visited, not applicable)" << endl;
+                    continue;
                 }
             }
 
-            // v가 EVEN이고 root가 다르면 augmenting path 발견
-            else if (v_node.type == EVEN && u_node.root != v_node.root) {
-                this -> Augment(u, v);      // 이전 구현과 다르게 둘을 분리함
-                this -> init_without_pair();
-                return;  // 한 번 augment 후 트리 초기화
+            // UNLABELED이면 grow 확장
+            cout << v << ": Grow Permitted (GROW)" << endl;
+            auto& u_node = this -> node_list[u];
+            auto& v_node = this -> node_list[v];
+
+            v_node.parent = u;
+            this -> root[v] = this -> root[u];
+            v_node.type = ODD;
+            v_node.visited = true;
+
+            mcpm_node_idx vp = v_node.pair;
+            if (vp != -1) {
+                auto& vp_node = this -> node_list[vp];
+                if (vp_node.type == UNLABELED) {
+                    vp_node.parent = v;
+                    this -> root[vp] = this -> root[v];
+                    vp_node.type = EVEN;
+                    vp_node.visited = true;
+                    this -> grow_queue.push(vp);
+                }
             }
 
-            // v가 EVEN인데 같은 blo_tree면 blossom
-            else if (v_node.type == EVEN && u_node.root == v_node.root) {
-                mcpm_node_idx rep_pseudo = this -> Shrink(u, v);
-                this -> grow_queue.push(rep_pseudo); // 축약된 노드로 계속 탐색
-            }
+            this -> debug_alternating_tree_state();
         }
     }
 }
 
+
 void blossomV::init_without_pair() {
-    // 모든 노드를 초기화: 트리 구조, 방문 상태, 라벨 등
-    for (mcpm_node_idx i = 0; i < this -> nl_size; ++i) {
-        auto& node = node_list[i];
-        node.init_with_out_pair();
+    for (mcpm_node_idx i = 0; i < this -> origin_num; ++i) {
+        auto& node = this -> node_list[i];
+
+        // 기본 라벨링, 방문 여부, 트리 상태 초기화
+
+        node.init_with_out_pair_and_active();        
 
         this -> root[i] = i;
         this -> tip[i] = i;
+
+        // 원래 노드만 트리 재설정 대상
         this -> internal_node[i].clear();
+        this -> internal_node[i].push_back(i);
         this -> blo_tree[i].clear();
 
-        if (i < origin_num) {
-            this -> internal_node[i].push_back(i);
-            node.active = true;
-        } else {
-            node.active = false;
-        }
+        // 가상 노드 (Shrink) 는 구조를 보존하고, 숨김 처리만
     }
+    // for (mcpm_node_idx i = this -> origin_num; i < this -> nl_size; i++) {
+    //     if (this -> node_list[i].active) {
+    //         this -> node_list[i].type = EVEN;
+    //         this -> node_list[i].is_blossom = true;
+    //     }
+    // }
 
-    // grow queue 초기화
-    // https://stackoverflow.com/questions/709146/how-do-i-clear-the-stdqueue-efficiently
+    // Grow queue 초기화
     queue<int> empty;
     swap(this -> grow_queue, empty);
+
+    for (mcpm_node_idx i = 0; i < origin_num; ++i) {
+        if (this -> node_list[i].pair == -1 && (this -> node_list[i].active)) {
+            this -> node_list[i].type = EVEN;
+            this -> node_list[i].visited = true;
+            this -> root[i] = i;
+            this -> grow_queue.push(i);
+        } else {
+            this -> node_list[i].type = UNLABELED;
+        }
+    }
 }
+
 
 void blossomV::Augment(mcpm_node_idx u, mcpm_node_idx v) {
     // u, v는 각각 다른 alternating blo_tree의 EVEN 노드
     // 둘 사이의 Augmenting Path가 발견된 상황
 
     this -> matching(u, v);  // u와 v는 직접 매칭됨
+
+    cout << "AFTER MATCHING: " << endl;
+    this -> debug_alternating_tree_state();
     // u 쪽 트리를 따라 올라가며 flip
     // 이전에는 계속 matching을 넣어주려고 했는데 이제는 상황 발생하면 역으로 진행하면서 matching을 넣어 주는 걸로 
     this -> flip(u);
+
     // v 쪽 트리를 따라 올라가며 flip
     this -> flip(v);
 
-}
+    cout << "AFTER FLIP: " << endl;
+    this -> debug_alternating_tree_state();
 
+    // 어차피 대표 노드와 연결되므로, expand 나중에 호출해도 상관 없을듯
+
+    if (this->node_list[u].is_blossom) this -> Expand(u);
+    if (this->node_list[v].is_blossom) this -> Expand(v);
+}
 
 mcpm_node_idx blossomV::Shrink(mcpm_node_idx u, mcpm_node_idx v) {
     // 1. u와 v의 경로를 타고 올라가면서 root까지의 경로를 저장
@@ -319,25 +395,38 @@ mcpm_node_idx blossomV::Shrink(mcpm_node_idx u, mcpm_node_idx v) {
     // 5. tip, root 정보 업데이트
     this -> tip[new_idx] = lca;
 
-    this -> node_list[new_idx].parent = this -> node_list[lca].parent;
-    this -> node_list[new_idx].root   = this -> node_list[lca].root;
-    this -> node_list[new_idx].type   = EVEN;
-    this -> node_list[new_idx].visited = true;
-    this -> node_list[new_idx].active = true;
+    this -> node_list[new_idx].parent       = this -> node_list[lca].parent;
+    // this -> node_list[new_idx].root     = this -> node_list[lca].root;
+    // this -> root[new_idx]               =  this -> root[lca];
+    this -> node_list[new_idx].x            = this -> node_list[this -> tip[new_idx]].x;
+    this -> node_list[new_idx].y            = this -> node_list[this -> tip[new_idx]].y;
+    this -> node_list[new_idx].type         = EVEN;
+    this -> node_list[new_idx].visited      = true;
+    this -> node_list[new_idx].active       = true;
+    this -> node_list[new_idx].is_blossom   = true;
     this -> root[new_idx] = new_idx;
+
+    // 6. 내부 노드 hide
+    // Shrink 시 내부 노드를 숨기기
+    for (auto i : this -> blo_tree[new_idx]) {
+        this -> node_list[i].active = false;
+    }
 
     return new_idx;  // 축약된 노드 index 반환 → grow에서 push 가능
 }
 
 void blossomV::matching(mcpm_node_idx u, mcpm_node_idx v) {
+
+    this -> node_list[this -> tip[u]].pair = this -> tip[v];
+    this -> node_list[this -> tip[v]].pair = this -> tip[u];
+
     this -> node_list[u].pair = v;
     this -> node_list[v].pair = u;
-    this -> matching_num++;  // 한 쌍 추가
 
-    // expand는 둘중 하나라도 blossom이면 일어나야 함 -> 그래서 내부 조건에 입력 u가 blossom이 아니면 탈출하도록 설정
-    // 두번 호출에서 두번 다 탈출하면 -> 둘다 일반 노드
-    this -> Expand(u);
-    this -> Expand(v);
+    this -> matching_num += 1;  // 한 쌍 추가
+
+    cout << "AFTER PAIR: " << endl;
+    this -> debug_alternating_tree_state();
 }
 
 void blossomV::flip(mcpm_node_idx u) {
@@ -354,60 +443,62 @@ void blossomV::flip(mcpm_node_idx u) {
         mcpm_node_idx grandparent = parent_node.parent;
 
         // Blossom이면 확장해서 내부 pair를 먼저 재설정
-        this -> matching(parent, grandparent); 
+        this -> node_list[parent].pair = grandparent;
+        this -> node_list[grandparent].pair = parent;
         // 다음 대상은 grandparent
         cur = grandparent;
     }
 }
 
-
-void blossomV::Expand(mcpm_node_idx b, bool expandBlocked) {
+void blossomV::Expand(mcpm_node_idx b) {
     // 0. 일반 노드이거나 blossom 내부 정보가 비어있으면 탈출
-    if (b < this -> origin_num || this -> blo_tree[b].empty()) return;
+    if (b < this->origin_num || this->blo_tree[b].empty()) return;
 
     // 1. 이 블로섬과 매칭된 노드 가져오기
-    mcpm_node_idx b_pair = this -> node_list[b].pair;
+    mcpm_node_idx b_pair = this->node_list[b].pair;
+    cout << "b_pair: " << b_pair << endl;
 
-    // 2. shallow 회로 (blo_tree[b]) 기준으로 tip부터 내부 노드들 짝지음
-    //    tip은 항상 홀수 길이의 시작점이다: (+ - + - + ...)
-    auto it = this -> blo_tree[b].begin();
-    this -> node_list[*it].pair = b_pair;  // tip은 b_pair와 연결
+    // 2. tip 노드: 항상 홀수 길이 시작점 (+ - + - ...)
+    auto it = this->blo_tree[b].begin();
+    mcpm_node_idx tip = *it;
+
+    this->node_list[tip].pair = b_pair;
+    this->node_list[b_pair].pair = tip;
     ++it;
 
-    int match_count = 0;
-    while (it != this -> blo_tree[b].end()) {
+    while (it != this->blo_tree[b].end()) {
         auto u = *it++;
-        if (it == this -> blo_tree[b].end()) break;
+        if (it == this->blo_tree[b].end()) break;
         auto v = *it++;
-    
-        if (this -> node_list[u].pair == -1 && this -> node_list[v].pair == -1) {
-            match_count++;
-        }
-    
-        this -> node_list[u].pair = v;
-        this -> node_list[v].pair = u;
-    }
-    this -> matching_num += match_count;
-    
 
-    // 3. 내부 노드들에 대해 root 및 active 복구
-    for (mcpm_node_idx x : this -> internal_node[b]) {
-        this -> root[x] = x;
-        this -> node_list[x].active = true;
+        this->node_list[u].pair = v;
+        this->node_list[v].pair = u;
     }
 
-    for (mcpm_node_idx x : this -> blo_tree[b]) {
-        this -> root[x] = x;
-        this -> node_list[x].active = true;
+    // 3. root 및 active 복구
+    for (mcpm_node_idx x : this->internal_node[b]) {
+        this->root[x] = x;
+        this->node_list[x].active = true;
+    }
+    for (mcpm_node_idx x : this->blo_tree[b]) {
+        this->root[x] = x;
+        this->node_list[x].active = true;
     }
 
-    this -> add_free_blossom_index(b);
+    // 4. blossom 삭제
+
+    this->add_free_blossom_index(b);
+    cout << "AFTER: EXPAND: " << endl;
+    this->debug_alternating_tree_state();
 }
+
 
 void blossomV::add_free_blossom_index(mcpm_node_idx b) {
     this -> blo_tree[b].clear();
     this -> internal_node[b].clear();
-    this -> node_list[b].init();  // pair, parent, type, visited, active 등 초기화
+    this -> tip[b] = -1;
+    this -> node_list[b].free_blossom_node();  // pair, parent, type, visited, active 등 초기화
+    this -> node_list[b].index_at_oddIndices = b;
     this -> recycle_idx.push(b);  // 재활용 큐에 넣기
 }
 
@@ -437,8 +528,167 @@ bool blossomV::check_tight(mcpm_node_idx u, mcpm_node_idx v){
         (u_node.y - v_node.y) * (u_node.y - v_node.y)
     );
 
-    double slack = u_node.dual_value + v_node.dual_value - distance;
-    return fabs(slack) < 1e-9;  // https://www.reddit.com/r/learnprogramming/comments/9y9gxs/small_lesson_of_the_day_never_check_two_floats/
+    double slack = distance - (u_node.dual_value + v_node.dual_value);
+    return fabs(slack) < 1e-6;  // https://www.reddit.com/r/learnprogramming/comments/9y9gxs/small_lesson_of_the_day_never_check_two_floats/
 }
 
 
+void blossomV::dual_update() {
+    double min_delta = INF; // 최소 델타 값을 저장할 변수
+
+    cout << "\n[D] ======= Dual Update Start =======" << endl;
+
+    // Phase 1: 델타 후보 계산
+    // 활성화된 모든 EVEN 노드 (u)에서 다른 활성화된 노드 (v)로의 간선을 탐색
+    for (mcpm_node_idx u = 0; u < nl_size; ++u) { 
+        if (!node_list[u].active || node_list[u].type != EVEN) continue;
+
+        for (mcpm_node_idx v = 0; v < nl_size; ++v) {
+            if (u == v || !node_list[v].active) continue;
+
+            double dist = sqrt(pow(node_list[u].x - node_list[v].x, 2) +
+                               pow(node_list[u].y - node_list[v].y, 2));
+            double slack = dist - (node_list[u].dual_value + node_list[v].dual_value);
+
+            if (slack < -1e-9) { 
+                cout << "[WARNING] Negative slack encountered (u=" << u << ", v=" << v << ") slack=" << slack << endl;
+                continue;
+            }
+            if (fabs(slack) < 1e-9) { 
+                slack = 0.0;
+            }
+
+            if (node_list[v].type == UNLABELED) {
+                min_delta = min(min_delta, slack);
+                cout << "[Delta Candidate 1 - EVEN to UNLABELED] (" << u << "," << v << ") slack=" << slack << endl;
+            }
+            else if (node_list[v].type == EVEN) {
+                min_delta = min(min_delta, slack / 2.0);
+                cout << "[Delta Candidate 2/3 - EVEN to EVEN] (" << u << "," << v << ") slack/2=" << slack / 2.0 << endl;
+            }
+        }
+    }
+
+    // Phase 2: ODD 타입 블러섬 확장 조건
+    for (mcpm_node_idx i = origin_num; i < nl_size; ++i) {
+        if (node_list[i].active && node_list[i].type == ODD) { 
+            min_delta = min(min_delta, node_list[i].dual_value);
+            cout << "[Delta Candidate 4 (Blossom Expand)] node " << i << " dual=" << node_list[i].dual_value << endl;
+        }
+    }
+
+    double delta = min_delta;
+    cout << "[D] Calculated min_delta=" << min_delta << " → delta=" << delta << endl;
+
+    if (delta == INF || delta < 1e-9) { 
+        cout << "[D] Dual update skipped: delta too small or INF." << endl;
+        return;
+    }
+
+    for (mcpm_node_idx i = 0; i < nl_size; ++i) {
+        if (!node_list[i].active) continue;
+
+        if (node_list[i].type == EVEN) {
+            node_list[i].dual_value += delta;
+        } 
+        else if (node_list[i].type == ODD) {
+            node_list[i].dual_value = max(0.0, node_list[i].dual_value - delta);
+        }
+    }
+
+    for (mcpm_node_idx i = origin_num; i < nl_size; ++i) {
+        auto& node = node_list[i];
+        if (node.active && node.type == ODD && fabs(node.dual_value) < 1e-9) {
+            cout << "EXPAND Blossom node " << i << " due to zero dual value!" << endl;
+            this -> Expand(i); 
+        }
+    }
+    cout << "[D] ======= Dual Update Done =======\n" << endl;
+    this -> debug_alternating_tree_state();
+    manage_blo_tight();
+
+}
+
+void blossomV::manage_blo_tight() {
+    // queue에는 못들어가는 tight blo - blo짝 전부 처리
+    for (int u = this -> origin_num; u < nl_size; ++u) {
+        if (!node_list[u].active || !node_list[u].is_blossom || node_list[u].type != EVEN) {
+            cout << u << " is fucked" << endl;
+            continue;
+        }
+    
+        for (int v = u + 1; v < nl_size; ++v) {
+            if (!node_list[v].active || !node_list[v].is_blossom || node_list[v].type != EVEN) {
+                cout << v << " is fucked" << endl;
+                continue;
+            }
+    
+            if (!check_tight(u, v)) {
+                cout << "NOT TIGHT!!!!!!!" << endl;
+                continue;
+            }
+    
+            if (root[u] != root[v]) {
+                Augment(u, v);  // augment 가능
+                cout << "Dual_update Augment Done: (" << u <<", " << v << ")" << endl;
+            } else {
+                Shrink(u, v); // 같은 tree면 shrink
+                cout << "Dual_update Shrink Done: (" << u <<", " << v << ")" << endl;
+                // shrink된 pseudonode는 grow queue에 안 들어감
+            }
+        }
+    }
+}
+
+
+void blossomV::node_list_info() {
+    for (mcpm_node n: this -> node_list) {
+        cout << "index: " << n.index_at_oddIndices << endl;
+        cout << "Name: " << n.index_at_nodes << ", X: " << n.x << ", Y: " << n.y << endl;
+        cout << "type: " << n.type << ", root: " << this -> root[n.index_at_oddIndices] << ", parent: " << n.parent << ", pair: " << n.pair << ", dual value: " << n.dual_value << endl; 
+        if (n.active)   cout << "ACTIVE!!" << endl;
+        else            cout << "PASSIVE.." << endl;
+        cout << "------------------------------" << endl;
+    }
+
+}
+
+void blossomV::initialize_duals() {
+    for (mcpm_node_idx u = 0; u < this -> origin_num; ++u) {
+        double min_dist = INF;
+        for (mcpm_node_idx v = 0; v < this -> origin_num; ++v) {
+            if (u == v) continue;
+            double dist = sqrt(pow(this -> node_list[u].x - this -> node_list[v].x, 2) +
+                               pow(this -> node_list[u].y - this -> node_list[v].y, 2));
+            min_dist = min(min_dist, dist);
+        }
+        this -> node_list[u].dual_value = 0.5 * min_dist;
+    }
+}
+
+void blossomV::debug_alternating_tree_state() {
+    cout << "\n========= [ Alternating Tree Debug Info ] =========\n";
+    for (mcpm_node_idx i = 0; i < this->nl_size; ++i) {
+        const auto& node = this->node_list[i];
+
+        cout << "Node [" << i << "] ";
+        cout << "(x=" << node.x << ", y=" << node.y << ") ";
+        cout << "| active=" << node.active;
+        cout << ", is_blossom=" << node.is_blossom;
+        cout << ", type=";
+
+        switch (node.type) {
+            case EVEN: cout << "EVEN"; break;
+            case ODD: cout << "ODD"; break;
+            case UNLABELED: cout << "UNLABELED"; break;
+        }
+
+        cout << ", root=" << this->root[i];
+        cout << ", tip=" << this->tip[i];
+        cout << ", parent=" << node.parent;
+        cout << ", pair=" << node.pair;
+        cout << ", dual=" << node.dual_value;
+        cout << endl;
+    }
+    cout << "====================================================\n";
+}

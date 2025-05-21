@@ -1,13 +1,13 @@
 #include "christofides.h"
-#include "mcmp.h"
+#include "mcpm.h"
 #include <cmath>
 #include <set>
 #include <limits>
 #include <unordered_map>
+#include <iostream>
 
 using namespace std;
 
-#define INF 1e12
 
 double christofides::compute_distance(int u, int v) {
     auto [x1, y1] = nodes[u];
@@ -76,19 +76,33 @@ vector<mcpm_node>& christofides::odd_indices() {
         degrees[edge.second] += 1;
     }
     
-    int idx_at_odd = 1; // 1부터 담을것것
+    int idx_at_odd = 0; // 1부터 담을것것
     for (const auto& d : degrees) {
         if (d.second % 2 == 1) {
             mcpm_node v(idx_at_odd, d.first, this -> nodes[d.first].first, this -> nodes[d.first].second);
             this -> oddIndices.push_back(v);
+            idx_at_odd++;
         }
     }
 
     return this -> oddIndices;
 }
 
+void christofides::print_oddIndices() {
+    cout << endl;
+    cout << "ODD INDICES: " << endl;
+    for (mcpm_node n: this -> oddIndices) {
+        cout << "index: " << n.index_at_oddIndices << endl;
+        cout << "Name: " << n.index_at_nodes << ", X: " << n.x << ", Y: " << n.y << endl;
+        cout << "type: " << n.type << ", parent: " << n.parent << ", pair: " << n.pair << ", dual value: " << n.dual_value << endl; 
+        cout << "------------------------------" << endl;
+    }
+}
+
 void christofides::mcpm() {
-    blossomV minimum_cost_perfect_matching(this -> oddIndices);
+    // Matching minimum_cost_perfect_matching(this -> oddIndices);
+    // minimum_cost_perfect_matching.solve();
+    blossomV minimum_cost_perfect_matching(this -> oddIndices); 
     minimum_cost_perfect_matching.execute_all();
 }
 

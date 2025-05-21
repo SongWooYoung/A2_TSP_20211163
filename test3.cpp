@@ -12,25 +12,21 @@ int main() {
     tsp_parser.printInfo();
 
     const map<int, pair<double, double>>& node_list = tsp_parser.getNodes();
+    // 상위 N개 노드 선택
+    map<int, pair<double, double>> selected_nodes;
+    int count = 0;
+    for (const auto& [id, coord] : node_list) {
+        selected_nodes[id] = coord;
+        if (++count >= 600) break;
+    }
 
-    christofides xql662(node_list);
+    christofides xql662(selected_nodes);
 
     xql662.compute_mst();
-    // vector<pair<int, int>> list = xql662.get_mst_edges();
+    xql662.odd_indices();
+    //xql662.print_oddIndices();
 
-    // for (pair<int, int> a: list) {
-    //     cout << "from: " << a.first << ", to: " << a.second << endl;
-    // }
-
-    // 아래 코드는 수정전 만들어놔서 실행 x
-    // vector<int> list = xql662.odd_indices();
-    // cout << "odd Indices: " << endl;
-    // for (int index: list) {
-    //     cout << index << " ";
-    // }
-    // cout << endl;
-
-        
+    xql662.mcpm();
 
     return 0;
 }

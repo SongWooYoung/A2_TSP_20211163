@@ -3,8 +3,8 @@
 
 #include <vector>
 #include <map>
+#include "mcpm.h"
 
-struct mcpm_node;
 
 class christofides {
 private:
@@ -18,6 +18,7 @@ public:
     void compute_mst();
     std::vector<std::pair<int, int>> get_mst_edges();
     std::vector<mcpm_node>& odd_indices();
+    void print_oddIndices();
     void mcpm();
 };
 

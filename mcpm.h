@@ -9,12 +9,14 @@
 #include <limits>
 #include <cassert>
 
+#define INF 1e12
+
 typedef int mcpm_node_idx;
 
 enum NodeType {
-    UNLABELED = 0,
-    EVEN = -1,
-    ODD = 1
+    UNLABELED = 0, // None
+    ODD = -1, // -
+    EVEN = 1 // +
 };
 
 struct mcpm_node {
@@ -25,7 +27,7 @@ struct mcpm_node {
 
     // 상태 정보
     NodeType type;                      // EVEN, ODD, UNLABELED
-    mcpm_node_idx root;                 // 소속 트리의 루트
+    //mcpm_node_idx root;                 // 소속 트리의 루트
     mcpm_node_idx parent;               // 트리에서의 부모
 
     mcpm_node_idx pair;                 // 매칭된 노드
@@ -41,8 +43,9 @@ struct mcpm_node {
 
     mcpm_node(int idx_odd, int idx_nodes, int x, int y);
     mcpm_node& operator=(mcpm_node& other);
-    void init_with_out_pair();                    // 상태 초기화
+    void init_with_out_pair_and_active();                    // 상태 초기화
     void init();
+    void free_blossom_node();
 };
 
 class blossomV {
@@ -53,14 +56,13 @@ private:
     int matching_num;                    // 현재 매칭 수
 
     std::vector<mcpm_node_idx> root;                        // 해당 index가 어떤 root의 alternating tree에 존재하는지
-    std::vector<std::list<mcpm_node_idx>> internal_node;    // 각 blossom의 내부 노드들
-    std::vector<std::list<mcpm_node_idx>> blo_tree;             // shrink 시 shallow 회로
     std::vector<mcpm_node_idx> tip;                         // 각 blossom의 tip (== LCA of shrinked cycle)
-    std::vector<mcpm_node_idx> free_blossom_indices;        // 사용할 수 있는 가짜 노드 index
     std::queue<mcpm_node_idx> grow_queue;
-    std::vector<double> slack;                              // edge별 slack 값 (거리 기반)
+    //std::vector<double> slack;                            // edge별 slack 값 (거리 기반)
     std::queue<mcpm_node_idx> recycle_idx;                  // 빈 인덱스 보장 -> 바로 사용 가능 O(1)
-    
+    std::vector<std::list<mcpm_node_idx>> internal_node;    // 각 blossom의 내부 노드들
+    std::vector<std::list<mcpm_node_idx>> blo_tree;         // shrink 시 shallow 회로
+
 public:
     blossomV(std::vector<mcpm_node>& list);
 
@@ -68,6 +70,7 @@ public:
     void execute_all();
 
     // 초기 Heuristic matching
+    void initialize_duals();
     void Heuristic(); // greedy 하게 탐색 후 시작 -> 시간 복잡도 감소
 
     // Grow 단계
@@ -79,10 +82,13 @@ public:
     void flip(mcpm_node_idx u);
     void Augment(mcpm_node_idx u, mcpm_node_idx v);
     mcpm_node_idx Shrink(mcpm_node_idx u, mcpm_node_idx v);
-    void Expand(mcpm_node_idx u, bool expandBlocked = false);
+    void Expand(mcpm_node_idx u);
+    void manage_blo_tight();
 
     // 기타 유틸리티
     bool check_tight(mcpm_node_idx u, mcpm_node_idx v);
+    void node_list_info();
+    void debug_alternating_tree_state();
 
     // blossom 할당 및 정리
     mcpm_node_idx allocate_new_pseudo();
