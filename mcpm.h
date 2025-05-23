@@ -8,6 +8,9 @@
 #include <utility>
 #include <limits>
 #include <cassert>
+#include <iomanip>
+#include <set>
+
 
 
 // 논문과 아래 깃허브에 구현된 방향성을 참고해 구현 하였음
@@ -27,7 +30,7 @@ struct mcpm_node {
     // 기본 정보
     mcpm_node_idx index_at_oddIndices;  // Working set에서의 인덱스 -> 얘가 mcpm_node_idx
     int index_at_nodes;                 // 실제 그래프 인덱스
-    double x, y;                           // 위치 정보 (거리 계산용)
+    int x, y;                           // 위치 정보 (거리 계산용)
 
     // 상태 정보
     NodeType type;                      // EVEN, ODD, UNLABELED
@@ -65,6 +68,7 @@ private:
     std::queue<mcpm_node_idx> recycle_idx;                  // 빈 인덱스 보장 -> 바로 사용 가능 O(1)
     std::vector<std::list<mcpm_node_idx>> internal_node;    // 각 blossom의 내부 노드들
     std::vector<std::list<mcpm_node_idx>> blo_tree;         // shrink 시 shallow 회로
+    std::vector<std::vector<mcpm_node_idx>> child;
 
 public:
     blossomV(std::vector<mcpm_node>& list);
@@ -77,20 +81,26 @@ public:
     void Heuristic(); // greedy 하게 탐색 후 시작 -> 시간 복잡도 감소
 
     // Grow 단계
-    void Grow();
+    void primal_update();
     void init_without_pair();
 
     // Matching 및 Tree 조작
+    void Grow(mcpm_node_idx u, mcpm_node_idx v);
     void matching(mcpm_node_idx u, mcpm_node_idx v);
     void flip(mcpm_node_idx u);
+    void flip_upward(mcpm_node_idx u);
+    void flip_downward(mcpm_node_idx u);
     void Augment(mcpm_node_idx u, mcpm_node_idx v);
     mcpm_node_idx Shrink(mcpm_node_idx u, mcpm_node_idx v);
     void Expand(mcpm_node_idx u);
-    void manage_blo_tight();
+    void manage_tight();
+    void flip_blossom_internal(mcpm_node_idx blossom_idx, mcpm_node_idx external_pair);
 
     // 기타 유틸리티
     bool check_tight(mcpm_node_idx u, mcpm_node_idx v);
     void debug_alternating_tree_state();
+    void print_mcpm_total_weight();
+    void print_pairs();
 
     // blossom 할당 및 정리
     mcpm_node_idx allocate_new_pseudo();

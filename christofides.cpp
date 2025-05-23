@@ -1,5 +1,6 @@
 #include "christofides.h"
 #include "mcpm.h"
+#include <iomanip>
 
 
 using namespace std;
@@ -10,7 +11,7 @@ double christofides::compute_distance(int u, int v) {
     auto [x2, y2] = nodes[v];
     double dx = x1 - x2;
     double dy = y1 - y2;
-    return sqrt(dx * dx + dy * dy);
+    return (sqrt(dx * dx + dy * dy));
 }
 
 christofides::christofides(const map<int, pair<double, double>>& nodes) {
@@ -60,7 +61,7 @@ vector<tuple<int, int, double>> christofides::get_mst_edges() {
     return this -> mst_edges;
 }
 
-vector<mcpm_node>& christofides::odd_indices() {
+void christofides::odd_indices() {
     // 노드 ID는 실제 ID 기준으로 degree를 관리
     unordered_map<int, int> degrees; // index, num
     for (const auto& node : this -> nodes) {
@@ -72,16 +73,15 @@ vector<mcpm_node>& christofides::odd_indices() {
         degrees[get<1>(edge)] += 1;
     }
     
-    int idx_at_odd = 0; // 1부터 담을것것
+    int idx_at_odd = 0; 
     for (const auto& d : degrees) {
         if (d.second % 2 == 1) {
+            // d.first -> 1부터 시작
             mcpm_node v(idx_at_odd, d.first, this -> nodes[d.first].first, this -> nodes[d.first].second);
             this -> oddIndices.push_back(v);
             idx_at_odd++;
         }
     }
-
-    return this -> oddIndices;
 }
 
 void christofides::print_oddIndices() {
@@ -94,6 +94,18 @@ void christofides::print_oddIndices() {
         cout << "------------------------------" << endl;
     }
 }
+
+void christofides::print_oddIndices2() {
+    cout << "[";
+    for (size_t i = 0; i < this->oddIndices.size(); ++i) {
+        cout << this->oddIndices[i].index_at_nodes-1;
+        if (i != this->oddIndices.size() - 1) {
+            cout << ", ";
+        }
+    }
+    cout << "]" << endl;
+}
+
 
 void christofides::mcpm() {
     blossomV minimum_cost_perfect_matching(this -> oddIndices); 
@@ -159,6 +171,44 @@ void christofides::erase_dups() {
     this -> path = move(tsp_path);
 }
 
+void christofides::erase_dups2() {
+    if (this->path.empty()) return;
+
+    unordered_set<int> visited;
+    vector<int> new_path;
+
+    int current = this->path[0];
+    visited.insert(current);
+    new_path.push_back(current);
+
+    while (visited.size() < this->nodes.size()) {
+        double min_dist = INF;
+        int next_node = -1;
+
+        for (int candidate : this->path) {
+            if (!visited.count(candidate)) {
+                double dist = compute_distance(current, candidate);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    next_node = candidate;
+                }
+            }
+        }
+
+        if (next_node != -1) {
+            visited.insert(next_node);
+            new_path.push_back(next_node);
+            current = next_node;
+        }
+    }
+
+    // 마지막에 출발점으로 돌아오는 edge 추가 (총 길이 계산 위해)
+    new_path.push_back(new_path[0]);
+
+    this->path = move(new_path);
+}
+
+
 double christofides::total_dist(){
     double total = 0.0;
     for (int i = 0; i + 1 < (int) this -> path.size(); ++i) {
@@ -179,9 +229,63 @@ void christofides::print_path() {
 void christofides::execute_all() {
     this -> compute_mst();
     this -> odd_indices();
+    this -> print_mst_total_weight();
+    // this -> print_oddIndices2();
     this -> mcpm();
     this -> euler_tour();
-    this -> erase_dups();
+    //this -> erase_dups();
+    this -> erase_dups2();
+    //this -> erase_dups_optimal();
+
     this -> print_path();
     cout << "TOTAL LENGTH: " << this -> total_dist() << endl;
+}
+
+void christofides::print_mst_total_weight() {
+    double total_weight = 0.0;
+
+    for (const auto& [u, v, w] : this -> mst_edges) {
+        total_weight += w;
+    }
+
+    cout << fixed << setprecision(6);
+    cout << "MST Total Weight: " << total_weight << endl;
+}
+
+void christofides::erase_dups_optimal() {
+    if (this->path.empty()) return;
+
+    vector<int> best_path;
+    unordered_set<int> visited;
+    double min_total = INF;
+
+    int start = this->path[0];
+    visited.insert(start);
+    vector<int> current_path = {start};
+
+    function<void(int, double)> dfs = [&](int current, double acc_dist) {
+        if (visited.size() == this->nodes.size()) {
+            // 마지막에 시작점으로 돌아오기
+            double total_dist = acc_dist + compute_distance(current, start);
+            if (total_dist < min_total) {
+                min_total = total_dist;
+                best_path = current_path;
+                best_path.push_back(start); // 순환 경로
+            }
+            return;
+        }
+
+        for (int next : this->path) {
+            if (!visited.count(next)) {
+                visited.insert(next);
+                current_path.push_back(next);
+                dfs(next, acc_dist + compute_distance(current, next));
+                current_path.pop_back();
+                visited.erase(next);
+            }
+        }
+    };
+
+    dfs(start, 0.0);
+    this->path = best_path;
 }

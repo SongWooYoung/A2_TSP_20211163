@@ -17,14 +17,13 @@ int main() {
     int count = 0;
     for (const auto& [id, coord] : node_list) {
         selected_nodes[id] = coord;
-        if (++count >= 280) break;
+        if (++count >= 40) break;
     }
 
-    christofides xql662(selected_nodes);
+    christofides TSP(selected_nodes);
 
     // 1. MST
-    xql662.execute_all();
-
+    TSP.execute_all();
 
     return 0;
 }

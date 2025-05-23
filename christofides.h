@@ -29,15 +29,19 @@ public:
     // 유틸리티
     double compute_distance(int u, int v);
     std::vector<std::tuple<int, int, double>> get_mst_edges();
+    void print_mst_total_weight();
     void print_oddIndices();
+    void print_oddIndices2();
     void print_path();
 
     // process
     void compute_mst();
-    std::vector<mcpm_node>& odd_indices();
+    void odd_indices();
     void mcpm();
     void euler_tour();
     void erase_dups();
+    void erase_dups2();
+    void erase_dups_optimal();
     double total_dist();
 
     // total process
