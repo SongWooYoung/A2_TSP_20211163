@@ -11,7 +11,7 @@ SRCS_tsp_parser = conv2list.cpp pugixml.cpp
 SRCS_christofides = christofides.cpp conv2list.cpp pugixml.cpp
 SRCS_test = test.cpp conv2list.cpp pugixml.cpp Held_Karp.cpp
 SRCS_test2 = test2.cpp Held_Karp.cpp
-SRCS_test3 = test3.cpp christofides.cpp mcpm.cpp
+SRCS_test3 = test3.cpp Held_Karp.cpp christofides.cpp mcpm2.cpp approx2.cpp #mcpm.cpp
 
 OBJS_tsp_parser = $(SRCS_tsp_parser:.cpp=.o)
 OBJS_christofides = $(SRCS_christofides:.cpp=.o)

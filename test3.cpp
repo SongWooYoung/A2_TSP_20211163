@@ -1,6 +1,8 @@
 #include "TSParser.h"
 #include <iostream>
 #include "christofides.h"
+#include "approx2.h"
+#include "Held_Karp.h"
 
 using namespace std;
 
@@ -17,13 +19,14 @@ int main() {
     int count = 0;
     for (const auto& [id, coord] : node_list) {
         selected_nodes[id] = coord;
-        if (++count >= 40) break;
+        if (++count >= 280) break;
     }
 
-    christofides TSP(selected_nodes);
+    //christofides TSP_ach(selected_nodes);
+    approx2 TSP_apx2(selected_nodes);
 
     // 1. MST
-    TSP.execute_all();
+    TSP_apx2.execute_all();
 
     return 0;
 }
