@@ -7,61 +7,103 @@ approx2::approx2(const map<int, pair<double, double>>& nodes) : nodes(nodes) {
 
 }
 
-void approx2::execute_all() {
-    this -> compute_mst();
-    this -> change_container();
-    this -> preorder_DFS();
+#include <chrono>
 
-    this -> print_total_length();
-    this -> print_path();
+void approx2::execute_all() {
+    using namespace std::chrono;
+
+    auto start = high_resolution_clock::now();
+
+    // 1. MST 생성
+    auto t1 = high_resolution_clock::now();
+    this->compute_mst();
+    auto t2 = high_resolution_clock::now();
+    cout << "MST DONE in "
+         << duration_cast<duration<double>>(t2 - t1).count()
+         << " seconds" << endl;
+
+    // 2. 컨테이너 생성
+    t1 = high_resolution_clock::now();
+    this->change_container();
+    t2 = high_resolution_clock::now();
+    cout << "Change Container DONE in "
+         << duration_cast<duration<double>>(t2 - t1).count()
+         << " seconds" << endl;
+
+    // 3. DFS
+    t1 = high_resolution_clock::now();
+    this->preorder_DFS();
+    t2 = high_resolution_clock::now();
+    cout << "DFS DONE in "
+         << duration_cast<duration<double>>(t2 - t1).count()
+         << " seconds" << endl;
+
+    // 4. 거리 계산 및 출력
+    t1 = high_resolution_clock::now();
+    this->print_total_length();
+    this->print_path();
+    t2 = high_resolution_clock::now();
+    cout << "Print DONE in "
+         << duration_cast<duration<double>>(t2 - t1).count()
+         << " seconds" << endl;
+
+    auto end = high_resolution_clock::now();
+    cout << "TOTAL EXECUTION TIME: "
+         << duration_cast<duration<double>>(end - start).count()
+         << " seconds" << endl;
 }
+
 
 double approx2::compute_distance(int u, int v) {
     auto [x1, y1] = this -> nodes[u];
     auto [x2, y2] = this -> nodes[v];
     double dx = x1 - x2;
     double dy = y1 - y2;
-    return (sqrt(dx * dx + dy * dy));
+    return (int) (sqrt(dx * dx + dy * dy) + 0.5);
 }
 
 void approx2::compute_mst() {
-    if (this -> nodes.empty()) return;
+    if (this->nodes.empty()) return;
 
-    set<int> in_mst;
-    set<int> remaining;
-    for (const auto& node : this -> nodes) {
-        remaining.insert(node.first);
-    }
+    int n = this->nodes.size();
+    vector<bool> in_mst(n + 1, false); // index 1-based
+    vector<double> min_dist(n + 1, INF);
+    vector<int> parent(n + 1, -1);
 
-    // 임의 시작점
-    int start = this -> nodes.begin()->first;
-    in_mst.insert(start);
-    remaining.erase(start);
+    auto cmp = [](const pair<double, int>& a, const pair<double, int>& b) {
+        return a.first > b.first; // min-heap
+    };
 
-    while (!remaining.empty()) {
-        double min_dist = INF;
-        int from = -1;
-        int to = -1;
+    priority_queue<pair<double, int>, vector<pair<double, int>>, decltype(cmp)> pq(cmp);
 
-        // 현재 MST에 포함된 노드들에서, MST 밖의 노드까지 최소 거리 탐색
-        for (int u : in_mst) {
-            for (int v : remaining) {
-                double dist = compute_distance(u, v);
-                if (dist < min_dist) {
-                    min_dist = dist;
-                    from = u;
-                    to = v;
+    int start = this->nodes.begin()->first;
+    min_dist[start] = 0;
+    pq.emplace(0.0, start);
+
+    while (!pq.empty()) {
+        auto [cur_dist, u] = pq.top(); pq.pop();
+
+        if (in_mst[u]) continue;
+        in_mst[u] = true;
+
+        if (parent[u] != -1) {
+            double w = compute_distance(u, parent[u]);
+            this->mst_edges.emplace_back(u, parent[u], w);
+        }
+
+        for (const auto& [v_idx, v_coord] : this->nodes) {
+            if (!in_mst[v_idx]) {
+                double d = compute_distance(u, v_idx);
+                if (d < min_dist[v_idx]) {
+                    min_dist[v_idx] = d;
+                    parent[v_idx] = u;
+                    pq.emplace(d, v_idx);
                 }
             }
         }
-
-        if (to != -1) {
-            this -> mst_edges.emplace_back(from, to, min_dist);
-            in_mst.insert(to);
-            remaining.erase(to);
-        }
     }
 }
+
 
 void approx2::change_container() {
     for (auto& [u, v, w] : this -> mst_edges) {
@@ -101,7 +143,7 @@ void approx2::preorder_DFS() {
 void approx2::print_total_length() {
     double total = 0;
     for (int i = 0; i < (int) TSP_path.size()-1; i++) {
-       total += compute_distance(this -> TSP_path[i]-1 , this -> TSP_path[i+1]-1);
+       total += compute_distance(this -> TSP_path[i], this -> TSP_path[i+1]);
     }
     cout << "TOTAL LENGTH: " << total << endl;
 }

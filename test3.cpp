@@ -9,7 +9,7 @@ using namespace std;
 
 int main() {
 
-    TSPParser tsp_parser("a280.tsp");
+    TSPParser tsp_parser("mona-lisa100K.tsp");
     tsp_parser.parse();
     tsp_parser.printInfo();
 
@@ -19,7 +19,7 @@ int main() {
     int count = 0;
     for (const auto& [id, coord] : node_list) {
         selected_nodes[id] = coord;
-        if (++count >= 280) break;
+        if (++count >= 1000) break;
     }
 
     //christofides TSP_ach(selected_nodes);
