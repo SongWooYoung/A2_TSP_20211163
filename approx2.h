@@ -20,7 +20,7 @@ class approx2 {
         std::vector<std::tuple<int, int, double>> mst_edges; //  x, y, weight
         std::unordered_map<int, std::vector<std::pair<double, int>>> new_container;
         std::vector<int> TSP_path;
-
+        
     public:
         approx2(const std::map<int, std::pair<double, double>>& nodes);
     

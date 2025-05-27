@@ -62,48 +62,99 @@ double approx2::compute_distance(int u, int v) {
     return (int) (sqrt(dx * dx + dy * dy) + 0.5);
 }
 
+
+// void approx2::compute_mst() {
+//     if (this->nodes.empty()) return;
+
+//     int n = this->nodes.size();
+//     vector<bool> in_mst(n + 1, false); // index 1-based
+//     vector<double> min_dist(n + 1, INF);
+//     vector<int> parent(n + 1, -1);
+
+//     auto cmp = [](const pair<double, int>& a, const pair<double, int>& b) {
+//         return a.first > b.first; // min-heap
+//     };
+
+//     priority_queue<pair<double, int>, vector<pair<double, int>>, decltype(cmp)> pq(cmp);
+
+//     int start = this->nodes.begin()->first;
+//     min_dist[start] = 0;
+//     pq.emplace(0.0, start);
+
+//     while (!pq.empty()) {
+//         auto [cur_dist, u] = pq.top(); pq.pop();
+
+//         if (in_mst[u]) continue;
+//         in_mst[u] = true;
+
+//         if (parent[u] != -1) {
+//             double w = compute_distance(u, parent[u]);
+//             this->mst_edges.emplace_back(u, parent[u], w);
+//         }
+
+//         for (const auto& [v_idx, v_coord] : this->nodes) {
+//             if (!in_mst[v_idx]) {
+//                 double d = compute_distance(u, v_idx);
+//                 if (d < min_dist[v_idx]) {
+//                     min_dist[v_idx] = d;
+//                     parent[v_idx] = u;
+//                     pq.emplace(d, v_idx);
+//                 }
+//             }
+//         }
+//     }
+// }
+
 void approx2::compute_mst() {
-    if (this->nodes.empty()) return;
+    int V = nodes.size();
+    vector<int> node_index;  // 노드 번호를 0-based index로 매핑
+    unordered_map<int, int> index_map;  // 노드번호 → index
+    int idx = 0;
+    for (const auto& [id, _] : nodes) {
+        node_index.push_back(id);
+        index_map[id] = idx++;
+    }
 
-    int n = this->nodes.size();
-    vector<bool> in_mst(n + 1, false); // index 1-based
-    vector<double> min_dist(n + 1, INF);
-    vector<int> parent(n + 1, -1);
+    vector<bool> in_mst(V, false);
+    vector<double> key(V, INF);
+    vector<int> parent(V, -1);  // index 기준
 
-    auto cmp = [](const pair<double, int>& a, const pair<double, int>& b) {
-        return a.first > b.first; // min-heap
-    };
+    key[0] = 0;
 
-    priority_queue<pair<double, int>, vector<pair<double, int>>, decltype(cmp)> pq(cmp);
-
-    int start = this->nodes.begin()->first;
-    min_dist[start] = 0;
-    pq.emplace(0.0, start);
-
-    while (!pq.empty()) {
-        auto [cur_dist, u] = pq.top(); pq.pop();
-
-        if (in_mst[u]) continue;
-        in_mst[u] = true;
-
-        if (parent[u] != -1) {
-            double w = compute_distance(u, parent[u]);
-            this->mst_edges.emplace_back(u, parent[u], w);
+    for (int count = 0; count < V; count++) {
+        // 1. Find the minimum key vertex
+        int u = -1;
+        for (int i = 0; i < V; i++) {
+            if (!in_mst[i] && (u == -1 || key[i] < key[u])) {
+                u = i;
+            }
         }
 
-        for (const auto& [v_idx, v_coord] : this->nodes) {
-            if (!in_mst[v_idx]) {
-                double d = compute_distance(u, v_idx);
-                if (d < min_dist[v_idx]) {
-                    min_dist[v_idx] = d;
-                    parent[v_idx] = u;
-                    pq.emplace(d, v_idx);
+        in_mst[u] = true;
+
+        // 2. Update the keys of adjacent vertices
+        for (int v = 0; v < V; v++) {
+            if (!in_mst[v]) {
+                int u_id = node_index[u];
+                int v_id = node_index[v];
+                double weight = compute_distance(u_id, v_id);
+                if (weight < key[v]) {
+                    key[v] = weight;
+                    parent[v] = u;
                 }
             }
         }
     }
-}
 
+    // 3. Reconstruct mst_edges
+    for (int v = 1; v < V; v++) {
+        int u = parent[v];
+        int u_id = node_index[u];
+        int v_id = node_index[v];
+        double w = compute_distance(u_id, v_id);
+        this->mst_edges.emplace_back(u_id, v_id, w);
+    }
+}
 
 void approx2::change_container() {
     for (auto& [u, v, w] : this -> mst_edges) {

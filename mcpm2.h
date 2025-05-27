@@ -64,9 +64,12 @@ private:
     std::vector<mcpm_node_idx> tip;                         // 각 blossom의 tip (== LCA of shrinked cycle)
     std::queue<mcpm_node_idx> grow_queue;
     std::queue<mcpm_node_idx> recycle_idx;                  // 빈 인덱스 보장 -> 바로 사용 가능 O(1)
+    //std::vector<double> max_dual_delta;
+
     std::vector<std::list<mcpm_node_idx>> internal_node;    // 각 blossom의 내부 노드들
     std::vector<std::list<mcpm_node_idx>> blo_tree;         // shrink 시 shallow 회로
     std::vector<std::vector<mcpm_node_idx>> child;
+
 
 public:
     blossomV(std::vector<mcpm_node>& list);
@@ -92,6 +95,8 @@ public:
     void matching(mcpm_node_idx u, mcpm_node_idx v);
     void flip(mcpm_node_idx u, mcpm_node_idx v);
 
+    //void destroy_blossom();
+
     void flip_upward(mcpm_node_idx u);
     void flip_downward(mcpm_node_idx u);
     void reset_tree_state(mcpm_node_idx u);
@@ -101,8 +106,12 @@ public:
     mcpm_node_idx allocate_new_pseudo();
     void clean_blossom(mcpm_node_idx b);
     void merge_pairs(std::vector<std::tuple<int, int, double>>& mst_edges);
-
+    int dist(mcpm_node_idx u, mcpm_node_idx v) {
+        return static_cast<int>(sqrt(pow(node_list[u].x - node_list[v].x, 2) +
+                                     pow(node_list[u].y - node_list[v].y, 2)));
+    }
     void debug_alternating_tree_state();
+    void print_mcpm_total_weight();
 
 };
 

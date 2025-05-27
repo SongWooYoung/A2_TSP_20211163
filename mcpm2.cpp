@@ -85,7 +85,7 @@ void blossomV::execute_all() {
     int num = 1;
     while (this -> matching_num  < this -> origin_num/2) {
 
-        if (num > 5) break;
+        //if (num > 10) break;
         cout << "PHASE:" << num << endl;
         cout << "Purpose: " << this -> origin_num / 2 << endl;
         cout << "Matching NUM: " << this -> matching_num << endl;
@@ -104,17 +104,21 @@ void blossomV::execute_all() {
 
         num++;
     }
+
+    this -> print_mcpm_total_weight();
 }
 
 void blossomV::Clear() {
 
     this -> root.assign(this -> nl_size, 0);
-    this -> child.assign(this -> nl_size, std::vector<mcpm_node_idx>());
+    this -> child.assign(this -> nl_size, vector<mcpm_node_idx>());
     this -> internal_node.assign(this -> nl_size, {});
     this -> blo_tree.assign(this -> nl_size, {});
     this -> tip.assign(this -> nl_size, -1);
     this -> grow_queue = queue<int>();
     this -> recycle_idx = queue<mcpm_node_idx>();
+    // this -> max_dual_delta.assign(this -> nl_size, INF);
+
     for (mcpm_node_idx i = this -> origin_num; i < this -> nl_size; ++i) {
         this -> recycle_idx.push(i);
     }
@@ -142,8 +146,7 @@ void blossomV::Initialize_duals() {
         double min_dist = INF;
         for (mcpm_node_idx v = 0; v < this -> origin_num; ++v) {
             if (u == v) continue;
-            double dist = sqrt(pow(this -> node_list[u].x - this -> node_list[v].x, 2) +
-                               pow(this -> node_list[u].y - this -> node_list[v].y, 2));
+            double dist = this -> dist(u, v);
             min_dist = min(min_dist, dist);
         }
         this -> node_list[u].dual_value = 0.5 * min_dist;
@@ -229,77 +232,131 @@ void blossomV::primal_update() {
     }
 }
 
-
 void blossomV::dual_update() {
-    double delta = INF;
-    unordered_set<mcpm_node_idx> candi;
+    double e1 = INF, e2 = INF, e3 = INF;
+    bool inite1 = false, inite2 = false, inite3 = false;
 
-    for (mcpm_node_idx u = 0; u < this->origin_num; ++u) {
-        auto& u_node = this->node_list[u];
-        if (!u_node.active || u_node.type != EVEN) continue;
+    mcpm_node_idx grow_root = -1;
+    pair<mcpm_node_idx, mcpm_node_idx> augment_roots = {-1, -1};
+    mcpm_node_idx expand_root = -1;
 
-        for (mcpm_node_idx v = 0; v < this->nl_size; ++v) {
-            if (u == v) continue;
-            auto& v_node = this->node_list[v];
-            if (!v_node.active) continue;
+    // CASE 1: Grow 후보 (EVEN - UNLABELED)
+    for (mcpm_node_idx u = 0; u < origin_num; ++u) {
+        if (!node_list[u].active || node_list[u].type != EVEN) continue;
 
-            if (v_node.type == EVEN && this->root[u] != this->root[v]) {
-                double s = slack(u, v) / 2.0;
-                if (fabs(s - delta) < 1e-9) {
-                    candi.emplace(u);
-                    candi.emplace(v);
-                } else if (s < delta) {
-                    delta = s;
-                    candi.clear();
-                    candi.emplace(u);
-                    candi.emplace(v);
-                }
-            }
-            else if (v_node.type == UNLABELED) {
-                double s = slack(u, v);
-                if (fabs(s - delta) < 1e-9) {
-                    candi.emplace(u);  // only u
-                } else if (s < delta) {
-                    delta = s;
-                    candi.clear();
-                    candi.emplace(u);  // only u
-                }
+        for (mcpm_node_idx v = 0; v < nl_size; ++v) {
+            if (u == v || !node_list[v].active || node_list[v].type != UNLABELED) continue;
+
+            double s = slack(u, v);
+            if (!inite1 || s < e1) {
+                e1 = s;
+                inite1 = true;
+                grow_root = u;
             }
         }
     }
 
+    // CASE 2: Augment 후보 (EVEN - EVEN, 다른 트리)
+    for (mcpm_node_idx u = 0; u < origin_num; ++u) {
+        if (!node_list[u].active || node_list[u].type != EVEN) continue;
+
+        for (mcpm_node_idx v = 0; v < nl_size; ++v) {
+            if (u == v || !node_list[v].active || node_list[v].type != EVEN) continue;
+            if (root[u] == root[v]) continue;
+
+            double s = slack(u, v) / 2.0;
+            if (!inite2 || s < e2) {
+                e2 = s;
+                inite2 = true;
+                augment_roots = {u, v};
+            }
+        }
+    }
+
+    // CASE 3: Expand 후보 (ODD Blossom dual == 0)
+    for (mcpm_node_idx i = origin_num; i < nl_size; ++i) {
+        if (!node_list[i].active || node_list[i].type != ODD) continue;
+
+        double d = node_list[i].dual_value;
+        if (!inite3 || d < e3) {
+            e3 = d;
+            inite3 = true;
+            expand_root = i;
+        }
+    }
+    cout << "grow: " << grow_root << ", augment: (" << augment_roots.first << ", " << augment_roots.second << "), expand: " << expand_root << endl; 
+
+    // 가장 작은 delta 선택
+    double delta = INF;
+    unordered_set<mcpm_node_idx> affected_roots;
+
+    if (inite1 && e1 < delta) {
+        delta = e1;
+        affected_roots.clear();
+        affected_roots.insert(root[grow_root]);
+    }
+    if (inite2 && e2 < delta) {
+        delta = e2;
+        affected_roots.clear();
+        affected_roots.insert(root[augment_roots.first]);
+        affected_roots.insert(root[augment_roots.second]);
+    }
+    if (inite3 && e3 < delta) {
+        delta = e3;
+        affected_roots.clear();
+        affected_roots.insert(root[expand_root]);
+    }
+
     if (delta == INF) {
-        cout << "[WARN] dual_update(): No valid delta found." << endl;
+        cout << "[DUAL UPDATE] No eligible delta found.\n";
+        cout << "AUGMENT 2 EVEN BLOSSOM!" << endl;
+        for (mcpm_node_idx i = origin_num; i < nl_size; ++i) { // blossom 영역역
+            // EVEN + child.epmty() + dual = 0.0 -> 고립 -> 여러개 -> 따라서 둘 사이의 거리가 최소인 두 blossom을 강제 augment
+            if (node_list[i].active && node_list[i].type == EVEN && node_list[i].dual_value < 1e-9 && child[i].empty()) {
+                for (mcpm_node_idx j = i + 1; j < nl_size; ++j) {
+                    if (node_list[j].active && node_list[j].type == EVEN && node_list[j].dual_value < 1e-9 && child[j].empty()) {
+                        cout << "Before Augmenting: " << i << " and " << j << endl;
+                        this -> Augment(i, j);
+                        cout << "Augmenting: " << i << " and " << j << endl;
+                        break;
+                    }
+                }
+            } 
+        }
         return;
     }
 
-    cout << "DUAL UPDATE CAND: ";
-    for (mcpm_node_idx i : candi) cout << i << " ";
+    cout << "[DUAL UPDATE] delta = " << delta << ", roots = ";
+    for (auto r : affected_roots) cout << r << " ";
     cout << endl;
 
-    unordered_set<mcpm_node_idx> affected_roots;
-    for (mcpm_node_idx i : candi) {
-        affected_roots.insert(this->root[i]);
-    }
-
+    // Dual value 적용
     for (mcpm_node_idx i = 0; i < nl_size; ++i) {
-        auto& node = this->node_list[i];
-        if (!node.active) continue;
-        if (affected_roots.find(this->root[i]) == affected_roots.end()) continue;
+        if (!node_list[i].active) continue;
+        if (affected_roots.find(root[i]) == affected_roots.end()) continue;
 
-        if (node.type == EVEN) node.dual_value += delta;
-        else if (node.type == ODD)  node.dual_value -= delta;
+        if (node_list[i].type == EVEN) node_list[i].dual_value += delta;
+        else if (node_list[i].type == ODD) node_list[i].dual_value -= delta;
     }
 
+    // Expand 조건 적용
     for (mcpm_node_idx i = origin_num; i < nl_size; ++i) {
-        if (node_list[i].active &&
-            node_list[i].type == ODD &&
-            fabs(node_list[i].dual_value) < 1e-9)
-        {
+        if (node_list[i].active && node_list[i].type == ODD && fabs(node_list[i].dual_value) < 1e-9) {
             Expand(i);
         }
     }
 }
+
+// void blossomV::destroy_blossom() {
+//     // 모든 blossom을 제거하고, 노드들을 초기 상태로 되돌리기
+//     for (mcpm_node_idx i = origin_num; i < nl_size; ++i) {
+//         if (node_list[i].active && node_list[i].is_blossom) {
+//             for (mcpm_node_idx member : internal_node[i]) {
+//                 this -> node_list[member].active = true;
+//             }
+//         }
+//     }
+// }
 
 
 
@@ -311,6 +368,7 @@ void blossomV::Reset() { // 일반 노드들의 pair와 dual을 제외한 나머
     for (mcpm_node_idx i = 0; i < this -> origin_num; i++) {
         auto& node = this -> node_list[i];
         if (!node.active) continue; 
+
         node.init_with_out_pair_and_active();
         this -> root[i] = i;
         this -> tip[i] = i;
@@ -318,6 +376,7 @@ void blossomV::Reset() { // 일반 노드들의 pair와 dual을 제외한 나머
         this -> internal_node[i].push_back(i);
         this -> blo_tree[i].clear();
         this -> child[i].clear();
+        //this -> max_dual_delta[i] = INF; // ODD가 들어오면 갱신되어야 함 
         if (node.pair == -1) {
             node.type = EVEN;
             this -> grow_queue.push(i);
@@ -335,6 +394,7 @@ void blossomV::Grow(mcpm_node_idx u, mcpm_node_idx v) {
     v_node.visited = true;
     this -> root[v] = this -> root[u];
     this -> child[u].push_back(v);
+    //this -> max_dual_delta[v] = min(this -> max_dual_delta[v], v_node.dual_value);
 
     vp_node.type = EVEN;
     vp_node.parent = v;
@@ -349,6 +409,7 @@ void blossomV::Augment(mcpm_node_idx u, mcpm_node_idx v) {
     this -> flip(u,v); // 일단 matching을 뒤집고
 
     this -> ExpandAll(u, v); // 이후에 다시 순회하면서 blossom 끊어놓기
+
 }
 
 void blossomV::Shrink(mcpm_node_idx u, mcpm_node_idx v) {
@@ -419,6 +480,8 @@ void blossomV::Shrink(mcpm_node_idx u, mcpm_node_idx v) {
     this -> node_list[new_idx].visited      = true;
     this -> node_list[new_idx].active       = true;
     this -> node_list[new_idx].is_blossom   = true;
+    this -> node_list[new_idx].dual_value   = 0.0; // 초기 dual 값은 0으로 설정
+    this -> node_list[new_idx].pair         = -1; // 초기 pair는 없음
 
     // 6. 내부 노드 hide
     // Shrink 시 내부 노드를 숨기기
@@ -428,8 +491,8 @@ void blossomV::Shrink(mcpm_node_idx u, mcpm_node_idx v) {
 }
 
 void blossomV::ExpandAll(mcpm_node_idx u, mcpm_node_idx v) {
-    std::set<mcpm_node_idx> visited;
-    std::queue<mcpm_node_idx> q;
+    set<mcpm_node_idx> visited;
+    queue<mcpm_node_idx> q;
 
     q.push(u);
     q.push(v);
@@ -542,9 +605,10 @@ void blossomV::flip(mcpm_node_idx u, mcpm_node_idx v) {
 void blossomV::flip_upward(mcpm_node_idx u) {
     while (this -> node_list[u].parent != -1) {
         mcpm_node_idx p = this -> node_list[u].parent;
-        this -> node_list[u].pair = p;
-        this -> node_list[p].pair = u;
-        u = this -> node_list[p].parent;
+        mcpm_node_idx pp = this -> node_list[p].parent;
+        this -> node_list[p].pair = pp;
+        this -> node_list[pp].pair = p;
+        u = pp;
     }
 }
 
@@ -578,10 +642,7 @@ bool blossomV::check_tight(mcpm_node_idx u, mcpm_node_idx v){
 }
 
 double blossomV::slack(mcpm_node_idx u, mcpm_node_idx v) {
-    double dist = sqrt(pow(this -> node_list[u].x - this -> node_list[v].x, 2) +
-    pow(this -> node_list[u].y - this -> node_list[v].y, 2));
-    
-    return dist - (this -> node_list[u].dual_value + this -> node_list[v].dual_value);
+    return this -> dist(u,v) - (this -> node_list[u].dual_value + this -> node_list[v].dual_value);
 }
 
 mcpm_node_idx blossomV::allocate_new_pseudo() {
@@ -616,7 +677,7 @@ void blossomV::debug_alternating_tree_state() {
         const auto& node = this->node_list[i];
 
         cout << "Node [" << i << "] ";
-        // cout << "(x=" << node.x << ", y=" << node.y << ") ";
+        cout << "(x=" << node.x << ", y=" << node.y << ") ";
         cout << "| active=" << node.active;
         cout << ", is_blossom=" << node.is_blossom;
         cout << ", type=";
@@ -665,12 +726,34 @@ void blossomV::merge_pairs(vector<tuple<int, int, double>>& mst_edges) {
         auto& v_node = this -> node_list[v];
 
         if (v != -1 && !visited[u] && !visited[v]) {
-            double distance = sqrt(
-                (u_node.x - v_node.x) * (u_node.x - v_node.x) +
-                (u_node.y - v_node.y) * (u_node.y - v_node.y)
-            );
+            double distance = this-> dist(u, v);
             mst_edges.emplace_back(u_node.index_at_nodes, v_node.index_at_nodes, distance);
             visited[u] = visited[v] = true;
         }
     }
+}
+
+void blossomV::print_mcpm_total_weight() {
+    vector<bool> visited(this->nl_size, false);
+    double total_weight = 0.0;
+
+    for (mcpm_node_idx u = 0; u < this->origin_num; ++u) {
+        mcpm_node_idx v = this->node_list[u].pair;
+
+        if (v != -1 && !visited[u] && !visited[v]) {
+            auto& u_node = this->node_list[u];
+            auto& v_node = this->node_list[v];
+
+            double dist = sqrt(
+                (u_node.x - v_node.x) * (u_node.x - v_node.x) +
+                (u_node.y - v_node.y) * (u_node.y - v_node.y)
+            );
+
+            total_weight += dist;
+            visited[u] = visited[v] = true;
+        }
+    }
+
+    cout << fixed << setprecision(6);
+    cout << "MCPM Total Weight: " << total_weight << endl;
 }

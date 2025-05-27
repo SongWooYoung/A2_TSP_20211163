@@ -20,41 +20,53 @@ christofides::christofides(const map<int, pair<double, double>>& nodes) {
 }
 
 void christofides::compute_mst() {
-    if (this -> nodes.empty()) return;
-
-    set<int> in_mst;
-    set<int> remaining;
-    for (const auto& node : this -> nodes) {
-        remaining.insert(node.first);
+    int V = nodes.size();
+    vector<int> node_index;  // 노드 번호를 0-based index로 매핑
+    unordered_map<int, int> index_map;  // 노드번호 → index
+    int idx = 0;
+    for (const auto& [id, _] : nodes) {
+        node_index.push_back(id);
+        index_map[id] = idx++;
     }
 
-    // 임의 시작점
-    int start = this -> nodes.begin()->first;
-    in_mst.insert(start);
-    remaining.erase(start);
+    vector<bool> in_mst(V, false);
+    vector<double> key(V, INF);
+    vector<int> parent(V, -1);  // index 기준
 
-    while (!remaining.empty()) {
-        double min_dist = INF;
-        int from = -1;
-        int to = -1;
+    key[0] = 0;
 
-        // 현재 MST에 포함된 노드들에서, MST 밖의 노드까지 최소 거리 탐색
-        for (int u : in_mst) {
-            for (int v : remaining) {
-                double dist = compute_distance(u, v);
-                if (dist < min_dist) {
-                    min_dist = dist;
-                    from = u;
-                    to = v;
-                }
+    for (int count = 0; count < V; count++) {
+        // 1. Find the minimum key vertex
+        int u = -1;
+        for (int i = 0; i < V; i++) {
+            if (!in_mst[i] && (u == -1 || key[i] < key[u])) {
+                u = i;
             }
         }
 
-        if (to != -1) {
-            this -> mst_edges.emplace_back(from, to, min_dist);
-            in_mst.insert(to);
-            remaining.erase(to);
+        in_mst[u] = true;
+
+        // 2. Update the keys of adjacent vertices
+        for (int v = 0; v < V; v++) {
+            if (!in_mst[v]) {
+                int u_id = node_index[u];
+                int v_id = node_index[v];
+                double weight = compute_distance(u_id, v_id);
+                if (weight < key[v]) {
+                    key[v] = weight;
+                    parent[v] = u;
+                }
+            }
         }
+    }
+
+    // 3. Reconstruct mst_edges
+    for (int v = 1; v < V; v++) {
+        int u = parent[v];
+        int u_id = node_index[u];
+        int v_id = node_index[v];
+        double w = compute_distance(u_id, v_id);
+        this->mst_edges.emplace_back(u_id, v_id, w);
     }
 }
 

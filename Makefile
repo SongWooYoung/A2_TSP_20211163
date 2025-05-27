@@ -1,6 +1,6 @@
 # 컴파일러 및 옵션
 CXX = g++
-CXXFLAGS += -Wall -std=c++23 -g -fsanitize=address
+CXXFLAGS += -Wall -O2 -std=c++23 -g -fsanitize=address
 LDFLAGS += -fsanitize=address
 
 # 타겟 목록
