@@ -12,10 +12,10 @@ private:
     std::vector<std::vector<double>> dp;
     std::vector<std::vector<int>> parent;
 
-    void build_weight(const std::map<int, std::pair<double, double>>& nodes);
-
 public:
     HK_TSP(const std::map<int, std::pair<double, double>>& nodes);
+
+    void build_weight(const std::map<int, std::pair<double, double>>& nodes);
 
     void solve();
     double min_cost();

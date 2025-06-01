@@ -73,37 +73,23 @@ double HK_TSP::min_cost() {
 
 vector<int> HK_TSP::get_path() {
     vector<int> path;
+
     int mask = (1 << n) - 1;
-    int last = -1;
 
-    // 최종 도시 찾기 (min_cost()에서 parent에 기록된 last_city)
-    double min_total_cost = MAX;
-    for (int j = 1; j < n; ++j) {
-        double cost = dp[mask][j] + weight[j][0];
-        if (cost < min_total_cost) {
-            min_total_cost = cost;
-            last = j;
-        }
-    }
-
-    // 뒤에서부터 경로 복원
-    path.push_back(0); // 시작점
-    int current = last;
-    int current_mask = mask;
-    vector<int> reverse_path;
-    reverse_path.push_back(current);
+    // 최종 도시는 parent[mask][0]에 저장되어 있음
+    int current = parent[mask][0];
+    path.push_back(0);         // 시작점 (city 0)
+    path.push_back(current);   // 마지막 도시
 
     while (current != 0) {
-        int prev = parent[current_mask][current];
-        reverse_path.push_back(prev);
-        current_mask ^= (1 << current);
+        int prev = parent[mask][current];
+        mask ^= (1 << current);  // 현재 도시 제거
         current = prev;
+        path.push_back(current);
     }
 
-    // 뒤집고 시작점 추가
-    for (auto it = reverse_path.rbegin(); it != reverse_path.rend(); ++it) {
-        path.push_back(*it);
-    }
-
+    reverse(path.begin(), path.end());
     return path;
 }
+
+
