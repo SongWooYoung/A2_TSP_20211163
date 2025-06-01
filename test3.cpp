@@ -43,13 +43,13 @@ int main() {
     auto start = high_resolution_clock::now();
     size_t mem_before_kb = get_memory_usage_kb();
 
-    //christofides TSP_ch(selected_nodes);s
-    approx2 TSP_apx2(selected_nodes);
-    //HK_TSP tsp_hk(selected_nodes);
+    // christofides TSP_ch(selected_nodes);s
+    // approx2 TSP_apx2(selected_nodes);
+    // HK_TSP tsp_hk(selected_nodes);
 
-    //TSP_ch.execute_all();
-    TSP_apx2.execute_all();
-    //tsp_hk.solve();
+    // TSP_ch.execute_all();
+    // TSP_apx2.execute_all();
+    // tsp_hk.solve();
 
     auto end = high_resolution_clock::now();
     size_t mem_after_kb = get_memory_usage_kb();
